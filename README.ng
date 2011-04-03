@@ -1,0 +1,51 @@
+INTRO
+=====
+
+This project was forked from rfuse, a great FUSE language
+binding for Ruby.
+
+There is an other such binding called FuseFS but it does
+not implement all the necessary callbacks to do certain
+important operations.
+
+The rfuse project was probably abandoned in 2005, this is
+why I have started this project.
+
+DEPENDENCIES
+============
+
+ruby 1.8
+fuse 2.8
+
+INSTALLING
+==========
+
+To install it with rubygems:
+
+$ sudo gem install rfuse-ng
+
+To build from the source, install libfuse-dev, and:
+
+$ ruby ext/extconf.rb
+$ make
+
+...and there should be a rfuse_ng.so in the project root directory.
+
+USING
+=====
+
+Sorry, no docs here, see sample/test-ruby.rb
+
+To run the example:
+
+$ sudo mkdir /tmp/fuse
+$ sudo sample/test-ruby.rb
+
+..and there should be a filesystem mounted at /tmp/fuse.
+
+Umount should stop the example example filesystem program.
+
+AUTHOR
+======
+
+Tamás László Fábián <giganetom@gmail.com>

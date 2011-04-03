@@ -1,0 +1,7 @@
+#!/bin/bash
+
+#killall /usr/bin/ruby;ls /tmp/fuse
+touch /tmp/fuse/test
+setfattr -n "user.test" -v "peter" /tmp/fuse/test
+setfattr -n "user.test2" -v "hallo" /tmp/fuse/test
+getfattr -d /tmp/fuse/test

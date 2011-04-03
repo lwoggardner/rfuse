@@ -1,0 +1,95 @@
+2011-02-27
+
+All fuse operations are implemented. ioctl() and poll() are untested,
+thus, probably won't work properly. Please contact me if you can test
+these features, now I have a little bit more time for the project.
+
+Itegrated features from other folks' patches. Thanks for Grant Gardner
+(GG) and Yonatan Maman (YM)
+
+Pathces:
+
+YM-1: ruby_19_yonatan.pathc
+  * allow rfuse-ng to compile under ruby 1.9.2
+
+GG-1: 0001-allow-nil-for-readder-filler.patch
+  * allow readdir to push "nil" as the stat value into filler (fuse will
+    then call getattr() when required)
+  * allow open to place a ruby object into fuse_file_info->fh and be
+    cleaned up again in release
+
+GG-2: 0002-exception-backtraces-and-ruby-filehandle-object-in-o.patch
+  * tweak the error handling to log the caught exception and its
+    backtrace
+  * The error handling part will not print any output if the thrown
+    exception responds_to?(:errno) since I gather that would be expected
+    (eg ENOENT)
+
+GG-3: 0003-Add-fd-and-process-calls-to-RFuse-object.patch
+
+  This one allows you to run the event loop in ruby instead of calling
+  fuse_loop() which is useful if you want to install your own signal handlers
+  and cleanup nicely if fuse is unmounted externally.
+
+  eg...
+
+  def FuseFS.run
+    unless @fuse
+      raise "fuse is not mounted
+    end
+
+    begin
+        #Get the /dev/fuse fd
+        io = IO.for_fd(@fuse.fd)
+    rescue Errno::EBADF
+        raise "fuse not mounted"
+    end
+
+    @running = true
+    while @running
+        begin
+                IO.select([io])
+                # Process a fuse command, returns -1 if fuse has been
+                  unmounted remotely.
+                if (@fuse.process() < 0)
+                    @running = false
+                end
+        rescue Errno::EBADF
+                #We've tried to select on a dead fd...
+                @running = false
+        end
+    end
+   end
+
+BUGS to fix:
+
+Parameters are not handled correctly to fuse_mount, see test-ruby.rb
+for details.
+
+2010-06-20
+
+Only poll() and ioctl() are missing. Fixed compilation error
+on 64 bit systems and random segfault because of uninicialized
+memory
+
+2010-05-03: 0.3.0
+
+Fixed read() and write() bugs, updated example. Implemented
+truncate() in the example.
+
+Fuse operation fields are filled only, when the class respond_to the
+particular method.
+
+The example filesystem was tested with several hundred big files and
+all came back intact.
+
+2010-05-01: 0.2.0
+
+Switched to Fuse API 26 from 22. Fixed incompatibilities.
+Arranged fuse_op filling code, made a TODO list of missing
+functions.
+
+
+2010-05-01: 0.1
+
+Forked from rfuse, fixed compile warnings, gemified.
