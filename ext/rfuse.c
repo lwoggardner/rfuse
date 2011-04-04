@@ -25,14 +25,6 @@
 //this is a global variable where we store the fuse object
 static VALUE fuse_object;
 
-#define STR2CSTR(x) rb_compat_str2cstr(x)
-
-static char*
-rb_compat_str2cstr(VALUE x)
-{
-  return StringValuePtr(x);
-}
-
 static int unsafe_return_error(VALUE *args)
 {
  

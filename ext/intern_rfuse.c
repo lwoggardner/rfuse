@@ -7,13 +7,15 @@
 struct intern_fuse *intern_fuse_new() {
   struct intern_fuse *inf;
   inf = (struct intern_fuse *) malloc(sizeof(struct intern_fuse));
+  memset(inf, 0, sizeof(*inf));
   memset(&inf->fuse_op, 0, sizeof(struct fuse_operations));
   return inf;
 }
 
 int intern_fuse_destroy(struct intern_fuse *inf){
   //you have to take care, that fuse is unmounted yourself!
-  fuse_destroy(inf->fuse);
+  if(inf->fuse)
+    fuse_destroy(inf->fuse);
   free(inf);
   return 0;
 }

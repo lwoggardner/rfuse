@@ -1,5 +1,11 @@
 #include "helper.h"
 
+char*
+rb_compat_str2cstr(VALUE x)
+{
+  return StringValuePtr(x);
+}
+
 void rstat2stat(VALUE rstat, struct stat *statbuf)
 {
   statbuf->st_dev     = FIX2ULONG(rb_funcall(rstat,rb_intern("dev"),0));
@@ -58,7 +64,7 @@ struct fuse_args * rarray2fuseargs(VALUE rarray){
   for(i = 0; i < args->argc; i++) {
     v = RARRAY_PTR(rarray)[i];
     Check_Type(v, T_STRING);
-    args->argv[i] = rb_string_value_ptr(&v); //STR2CSTR(RSTRING(v));
+    args->argv[i] = strdup(rb_string_value_ptr(&v)); //STR2CSTR(RSTRING(v));
   }
   args->argv[args->argc] = NULL;
   
