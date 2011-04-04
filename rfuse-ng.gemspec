@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 require "rfuse-ng/version"
 
 Gem::Specification.new do |s|
-  s.name        = "rfuse-ng"
+  s.name        = "rfuse_ng"
   s.version     = RFuseNG::VERSION
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["William Josephson"]
