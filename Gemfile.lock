@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    tddium_client (0.0.5)
+    rfuse-ng (0.0.5)
 
 GEM
   remote: http://rubygems.org/
@@ -22,5 +22,5 @@ PLATFORMS
 
 DEPENDENCIES
   rake
+  rfuse-ng!
   rspec
-  tddium_client!
