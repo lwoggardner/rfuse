@@ -29,29 +29,21 @@ static VALUE fuse_object;
   #define STR2CSTR(X) StringValuePtr(X) 
 #endif
 
-// The ugliest hack I've seen today
-#if HAVE_RUBY_RUBY_H
-  static VALUE ruby_errinfo()
-  {
-    return rb_errinfo();
-  }
-#endif
-
 static int unsafe_return_error(VALUE *args)
 {
  
-  if (rb_respond_to(ruby_errinfo,rb_intern("errno"))) {
+  if (rb_respond_to(rb_errinfo(),rb_intern("errno"))) {
     //We expect these and they get passed on the fuse so be quiet...
-    return rb_funcall(ruby_errinfo,rb_intern("errno"),0);
+    return rb_funcall(rb_errinfo(),rb_intern("errno"),0);
   } else {
     VALUE info;
-    info = rb_inspect(ruby_errinfo);
+    info = rb_inspect(rb_errinfo());
     printf ("ERROR: Exception %s not an Errno:: !respond_to?(:errno) \n",STR2CSTR(info)); 
     //We need the ruby_errinfo backtrace not fuse.loop ... rb_backtrace();
-    VALUE bt_ary = rb_funcall(ruby_errinfo, rb_intern("backtrace"),0);
+    VALUE bt_ary = rb_funcall(rb_errinfo(), rb_intern("backtrace"),0);
     int c;
-    for (c=0;c<RARRAY(bt_ary)->len;c++) {
-      printf("%s\n",RSTRING(RARRAY(bt_ary)->ptr[c])->ptr);
+    for (c=0;c<RARRAY_LEN(bt_ary);c++) {
+      printf("%s\n",RSTRING_PTR(RARRAY_PTR(bt_ary)[c]));
     }
     return Qnil;
   }

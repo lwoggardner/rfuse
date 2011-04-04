@@ -2,6 +2,14 @@
 #include <fuse.h>
 #include "helper.h"
 
+#define STR2CSTR(x) rb_compat_str2cstr(x)
+
+static char*
+rb_compat_str2cstr(VALUE x)
+{
+  return StringValuePtr(x);
+}
+
 VALUE rfiller_initialize(VALUE self){
   return self;
 }
