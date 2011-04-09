@@ -45,6 +45,23 @@ VALUE file_info_flags(VALUE self) {
   return INT2FIX(f->flags);
 }
 
+VALUE file_info_direct(VALUE self) {
+   struct fuse_file_info *f;
+   Data_Get_Struct(self,struct fuse_file_info,f);
+  if (TYPE(f->direct_io) != T_NONE) {
+    return (VALUE) f->direct_io;
+  } else {
+    return Qnil;
+  }
+}
+
+VALUE file_info_direct_assign(VALUE self,VALUE value) {
+   struct fuse_file_info *f;
+   Data_Get_Struct(self,struct fuse_file_info,f);
+   f->direct_io = value;
+   return value;
+}
+
 //fh is possibly a pointer to a ruby object and can be set
 VALUE file_info_fh(VALUE self) {
    struct fuse_file_info *f;
@@ -69,6 +86,8 @@ VALUE file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"initialize",file_info_initialize,0);
   rb_define_method(cFileInfo,"flags",file_info_flags,0);
   rb_define_method(cFileInfo,"writepage",file_info_writepage,0);
+  rb_define_method(cFileInfo,"direct",file_info_direct,0);
+  rb_define_method(cFileInfo,"direct=",file_info_direct_assign,1);
   rb_define_method(cFileInfo,"fh",file_info_fh,0);
   rb_define_method(cFileInfo,"fh=",file_info_fh_assign,1);
   return cFileInfo;
