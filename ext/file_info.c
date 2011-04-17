@@ -62,6 +62,23 @@ VALUE file_info_direct_assign(VALUE self,VALUE value) {
    return value;
 }
 
+VALUE file_info_nonseekable(VALUE self) {
+   struct fuse_file_info *f;
+   Data_Get_Struct(self,struct fuse_file_info,f);
+  if (TYPE(f->nonseekable) != T_NONE) {
+    return (VALUE) f->nonseekable;
+  } else {
+    return Qnil;
+  }
+}
+
+VALUE file_info_nonseekable_assign(VALUE self,VALUE value) {
+   struct fuse_file_info *f;
+   Data_Get_Struct(self,struct fuse_file_info,f);
+   f->nonseekable = value;
+   return value;
+}
+
 //fh is possibly a pointer to a ruby object and can be set
 VALUE file_info_fh(VALUE self) {
    struct fuse_file_info *f;
@@ -88,6 +105,8 @@ VALUE file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"writepage",file_info_writepage,0);
   rb_define_method(cFileInfo,"direct",file_info_direct,0);
   rb_define_method(cFileInfo,"direct=",file_info_direct_assign,1);
+  rb_define_method(cFileInfo,"nonseekable",file_info_nonseekable,0);
+  rb_define_method(cFileInfo,"nonseekable=",file_info_nonseekable_assign,1);
   rb_define_method(cFileInfo,"fh",file_info_fh,0);
   rb_define_method(cFileInfo,"fh=",file_info_fh_assign,1);
   return cFileInfo;
