@@ -57,7 +57,7 @@ cflags   =  $(optflags) $(debugflags) $(warnflags)
 optflags = -O3
 debugflags = -ggdb
 warnflags = -Wextra -Wno-unused-parameter -Wno-parentheses -Wpointer-arith -Wwrite-strings -Wno-missing-field-initializers -Wno-long-long
-CFLAGS   = -fPIC $(cflags)  -fPIC -Wall -Werror -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 
+CFLAGS   = -fPIC $(cflags)  -fPIC -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 
 INCFLAGS = -I. -I$(arch_hdrdir) -I$(hdrdir)/ruby/backward -I$(hdrdir) -I$(srcdir)
 DEFS     = -D_FILE_OFFSET_BITS=64
 CPPFLAGS =   $(DEFS) $(cppflags)
