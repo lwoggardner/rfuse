@@ -1732,11 +1732,12 @@ static VALUE rf_initialize(
     inf->fuse_op.utimens     = rf_utimens;
   if (RESPOND_TO(self,"bmap"))
     inf->fuse_op.bmap        = rf_bmap;
+/*
   if (RESPOND_TO(self,"ioctl"))
     inf->fuse_op.ioctl       = rf_ioctl;
   if (RESPOND_TO(self,"poll"))
     inf->fuse_op.poll        = rf_poll;
-
+*/
 
   struct fuse_args
     *kargs = rarray2fuseargs(kernelopts),
