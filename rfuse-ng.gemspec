@@ -7,10 +7,10 @@ Gem::Specification.new do |s|
   s.version     = RFuseNG::VERSION
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Tamás László Fábián"]
-  s.email       = ["info@tddium.com"]
-  s.homepage    = "http://www.tddium.com/"
-  s.summary     = %q{rfuse-ng gem for Ruby 1.9.2}
-  s.description = %q{Ruby FUSE interface gem for Ruby 1.9.2}
+  s.email       = ["giganetom@gmail.com"]
+  s.homepage    = "http://github.com/tddium/rfuse-ng"
+  s.summary     = %q{Ruby language binding for FUSE}
+  s.description = %q{Ruby language binding for FUSE. It was forked from rfuse and modified for Ruby 1.9.2.}
 
   s.rubyforge_project = "rfuse-ng"
 
