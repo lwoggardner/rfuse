@@ -13,6 +13,7 @@
 #include <sys/xattr.h>
 #endif
 
+#include <ruby/encoding.h>
 #include "helper.h"
 #include "intern_rfuse.h"
 #include "filler.h"
@@ -93,6 +94,7 @@ static int rf_readdir(const char *path, void *buf,
 
   //create a filler object
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
 
   fuse_module = rb_const_get(rb_cObject, rb_intern("RFuse"));
 
@@ -136,6 +138,7 @@ static int rf_readlink(const char *path, char *buf, size_t size)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(size);
   char *rbuf;
   res=rb_protect((VALUE (*)())unsafe_readlink,(VALUE)args,&error);  
@@ -179,6 +182,7 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 
   //create a filler object
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
 
   fuse_module = rb_const_get(rb_cObject, rb_intern("RFuse"));
 
@@ -221,6 +225,7 @@ static int rf_mknod(const char *path, mode_t mode,dev_t dev)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2FIX(mode);
   args[2]=INT2FIX(dev);
   res=rb_protect((VALUE (*)())unsafe_mknod,(VALUE) args,&error);
@@ -252,6 +257,7 @@ static int rf_getattr(const char *path, struct stat *stbuf)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_getattr,(VALUE) args,&error);
 
   if (error || (res == Qnil))
@@ -284,6 +290,7 @@ static int rf_mkdir(const char *path, mode_t mode)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2FIX(mode);
   res=rb_protect((VALUE (*)())unsafe_mkdir,(VALUE) args,&error);
 
@@ -314,6 +321,7 @@ static int rf_open(const char *path,struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   //GG: is args[1] kept on the stack and thus referenced from the GC's perspective?
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_open,(VALUE) args,&error);
@@ -349,6 +357,7 @@ static int rf_release(const char *path, struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_release,(VALUE) args,&error);
   if (TYPE(ffi->fh) != T_NONE) {
@@ -383,6 +392,7 @@ static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
   int error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(datasync);
   args[2] = wrap_file_info(ffi);
 
@@ -416,6 +426,7 @@ static int rf_flush(const char *path,struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_flush,(VALUE) args,&error);
 
@@ -447,6 +458,7 @@ static int rf_truncate(const char *path,off_t offset)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2FIX(offset);
   res=rb_protect((VALUE (*)())unsafe_truncate,(VALUE) args,&error);
 
@@ -479,6 +491,7 @@ static int rf_utime(const char *path,struct utimbuf *utim)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(utim->actime);
   args[2]=INT2NUM(utim->modtime);
   res=rb_protect((VALUE (*)())unsafe_utime,(VALUE) args,&error);
@@ -512,6 +525,7 @@ static int rf_chown(const char *path,uid_t uid,gid_t gid)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2FIX(uid);
   args[2]=INT2FIX(gid);
   res=rb_protect((VALUE (*)())unsafe_chown,(VALUE) args,&error);
@@ -544,6 +558,7 @@ static int rf_chmod(const char *path,mode_t mode)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2FIX(mode);
   res=rb_protect((VALUE (*)())unsafe_chmod,(VALUE) args,&error);
 
@@ -574,6 +589,7 @@ static int rf_unlink(const char *path)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_unlink,(VALUE) args,&error);
 
   if (error)
@@ -603,6 +619,7 @@ static int rf_rmdir(const char *path)
   VALUE res;
   int error = 0;
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   res = rb_protect((VALUE (*)())unsafe_rmdir, (VALUE) args ,&error);
 
   if (error)
@@ -632,7 +649,9 @@ static int rf_symlink(const char *path,const char *as)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new2(as);
+  rb_enc_associate(args[1],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_symlink,(VALUE) args,&error);
 
   if (error)
@@ -663,7 +682,9 @@ static int rf_rename(const char *path,const char *as)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new2(as);
+  rb_enc_associate(args[1],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_rename,(VALUE) args,&error);
 
   if (error)
@@ -694,7 +715,9 @@ static int rf_link(const char *path,const char * as)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new2(as);
+  rb_enc_associate(args[1],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_link,(VALUE) args,&error);
 
   if (error)
@@ -747,6 +770,7 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
   char* rbuf;
 
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(size);
   args[2]=INT2NUM(offset);
   args[3]=wrap_file_info(ffi);
@@ -797,6 +821,7 @@ static int rf_write(const char *path,const char *buf,size_t size,
   int error = 0;
 
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new(buf, size);
   args[2]=INT2NUM(offset);
   args[3]=wrap_file_info(ffi);
@@ -831,6 +856,7 @@ static int rf_statfs(const char * path, struct statvfs * vfsinfo)
   int error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
 
   res = rb_protect((VALUE (*)())unsafe_statfs,(VALUE) args,&error);
 
@@ -870,6 +896,8 @@ static int rf_setxattr(const char *path,const char *name,
   int error = 0;
 
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
+  //TODO GG: Should the name and values be encoded as well?
   args[1]=rb_str_new2(name);
   args[2]=rb_str_new(value,size);
   args[3]=INT2NUM(size);
@@ -910,6 +938,7 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   long length = 0;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new2(name);
   args[2]=INT2NUM(size);
   res=rb_protect((VALUE (*)())unsafe_getxattr,(VALUE) args,&error);
@@ -952,6 +981,7 @@ static int rf_listxattr(const char *path,char *buf,
   size_t length =0;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(size);
   res=rb_protect((VALUE (*)())unsafe_listxattr,(VALUE) args,&error);
 
@@ -1002,6 +1032,7 @@ static int rf_removexattr(const char *path,const char *name)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new2(name);
   res=rb_protect((VALUE (*)())unsafe_removexattr,(VALUE) args,&error);
 
@@ -1033,6 +1064,7 @@ static int rf_opendir(const char *path,struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_opendir,(VALUE) args,&error);
 
@@ -1064,6 +1096,7 @@ static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_releasedir,(VALUE) args,&error);
 
@@ -1097,6 +1130,7 @@ static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
   VALUE res;
   int error = 0;
   args[0]=rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(meta);
   args[2]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_fsyncdir,(VALUE) args,&error);
@@ -1206,6 +1240,7 @@ static int rf_access(const char *path, int mask)
   VALUE res;
   int error = 0;
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(mask);
   res = rb_protect((VALUE (*)())unsafe_access,(VALUE) args,&error);
 
@@ -1241,6 +1276,7 @@ static int rf_create(const char *path, mode_t mode,
   int error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(mode);
   args[2] = wrap_file_info(ffi);
 
@@ -1278,6 +1314,7 @@ static int rf_ftruncate(const char *path, off_t size,
   int error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(size);
   args[2] = wrap_file_info(ffi);
 
@@ -1314,6 +1351,7 @@ static int rf_fgetattr(const char *path, struct stat *stbuf,
   int error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = wrap_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_fgetattr,(VALUE) args,&error);
@@ -1370,6 +1408,7 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
   );
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = wrap_file_info(ffi);
   args[2] = INT2NUM(cmd);
   args[3] = locko;
@@ -1412,6 +1451,7 @@ static int rf_utimens(const char * path, const struct timespec tv[2])
   int   error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
 
   // tv_sec * 1000000 + tv_nsec
   args[1] = rb_funcall(
@@ -1461,6 +1501,7 @@ static int rf_bmap(const char *path, size_t blocksize, uint64_t *idx)
   int   error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(blocksize);
   args[2] = LL2NUM(*idx);
 
@@ -1502,6 +1543,7 @@ static int rf_ioctl(const char *path, int cmd, void *arg,
   int   error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(cmd);
   args[2] = wrap_buffer(arg);
   args[3] = wrap_file_info(ffi);
@@ -1541,6 +1583,7 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
   int   error = 0;
 
   args[0] = rb_str_new2(path);
+  rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = wrap_file_info(ffi);
   args[2] = wrap_pollhandle(ph);
   args[3] = INT2NUM(*reventsp);
@@ -1604,7 +1647,11 @@ VALUE rf_mountname(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  return rb_str_new2(inf->mountname);
+  //TODO: GG assume this mount name should also have filesystem encoding
+  VALUE result = rb_str_new2(inf->mountname);
+  rb_enc_associate(result,rb_filesystem_encoding());
+
+  return result;
 }
 
 //----------------------INVALIDATE
