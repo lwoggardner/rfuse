@@ -23,8 +23,6 @@
 #include "pollhandle.h"
 #include "bufferwrapper.h"
 
-//this is a global variable where we store the fuse object
-static VALUE fuse_object;
 
 static int unsafe_return_error(VALUE *args)
 {
@@ -76,7 +74,7 @@ static VALUE unsafe_readdir(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("readdir"),5,wrap_context(ctx),path,filler,
+  return rb_funcall(ctx->private_data,rb_intern("readdir"),5,wrap_context(ctx),path,filler,
         offset,ffi);
 }
 
@@ -129,7 +127,7 @@ static VALUE unsafe_readlink(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("readlink"),3,wrap_context(ctx),path,size);
+  return rb_funcall(ctx->private_data,rb_intern("readlink"),3,wrap_context(ctx),path,size);
 }
 
 static int rf_readlink(const char *path, char *buf, size_t size)
@@ -164,7 +162,7 @@ static VALUE unsafe_getdir(VALUE *args)
   struct fuse_context *ctx = fuse_get_context();
 
   return rb_funcall(
-    fuse_object,rb_intern("getdir"),3,
+    ctx->private_data,rb_intern("getdir"),3,
     wrap_context(ctx),path,filler
   );
 }
@@ -216,7 +214,7 @@ static VALUE unsafe_mknod(VALUE *args)
   VALUE mode = args[1];
   VALUE dev  = args[2];
   struct fuse_context *ctx=fuse_get_context();
-  return rb_funcall(fuse_object,rb_intern("mknod"),4,wrap_context(ctx),path,mode,dev);
+  return rb_funcall(ctx->private_data,rb_intern("mknod"),4,wrap_context(ctx),path,mode,dev);
 }
 
 static int rf_mknod(const char *path, mode_t mode,dev_t dev)
@@ -247,7 +245,7 @@ static VALUE unsafe_getattr(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("getattr"),2,wrap_context(ctx),path);
+  return rb_funcall(ctx->private_data,rb_intern("getattr"),2,wrap_context(ctx),path);
 }
 
 //calls getattr with path and expects something like FuseStat back
@@ -280,7 +278,7 @@ static VALUE unsafe_mkdir(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("mkdir"),3,wrap_context(ctx),path,mode);
+  return rb_funcall(ctx->private_data,rb_intern("mkdir"),3,wrap_context(ctx),path,mode);
 }
 
 static int rf_mkdir(const char *path, mode_t mode)
@@ -316,7 +314,7 @@ static VALUE unsafe_open(VALUE *args)
   //Avoid calling the private kernel method "open" which
   //otherwise prevents delegation by method_missing
   //#TODO refactor all the API method calls to be like this
-  return rb_funcall3(fuse_object,rb_intern("open"),3,funargs);
+  return rb_funcall3(ctx->private_data,rb_intern("open"),3,funargs);
 }
 
 static int rf_open(const char *path,struct fuse_file_info *ffi)
@@ -352,7 +350,7 @@ static VALUE unsafe_release(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("release"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall(ctx->private_data,rb_intern("release"),3,wrap_context(ctx),path,ffi);
 }
 
 static int rf_release(const char *path, struct fuse_file_info *ffi)
@@ -385,7 +383,7 @@ static VALUE unsafe_fsync(VALUE *args) {
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("fsync"), 4, wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("fsync"), 4, wrap_context(ctx),
     path, datasync, ffi);
 }
 
@@ -421,7 +419,7 @@ static VALUE unsafe_flush(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("flush"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall(ctx->private_data,rb_intern("flush"),3,wrap_context(ctx),path,ffi);
 }
 
 static int rf_flush(const char *path,struct fuse_file_info *ffi)
@@ -453,7 +451,7 @@ static VALUE unsafe_truncate(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("truncate"),3,wrap_context(ctx),path,offset);
+  return rb_funcall(ctx->private_data,rb_intern("truncate"),3,wrap_context(ctx),path,offset);
 }
 
 static int rf_truncate(const char *path,off_t offset)
@@ -486,7 +484,7 @@ static VALUE unsafe_utime(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("utime"),4,wrap_context(ctx),path,actime,modtime);
+  return rb_funcall(ctx->private_data,rb_intern("utime"),4,wrap_context(ctx),path,actime,modtime);
 }
 
 static int rf_utime(const char *path,struct utimbuf *utim)
@@ -520,7 +518,7 @@ static VALUE unsafe_chown(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("chown"),4,wrap_context(ctx),path,uid,gid);
+  return rb_funcall(ctx->private_data,rb_intern("chown"),4,wrap_context(ctx),path,uid,gid);
 }
 
 static int rf_chown(const char *path,uid_t uid,gid_t gid)
@@ -553,7 +551,7 @@ static VALUE unsafe_chmod(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("chmod"),3,wrap_context(ctx),path,mode);
+  return rb_funcall(ctx->private_data,rb_intern("chmod"),3,wrap_context(ctx),path,mode);
 }
 
 static int rf_chmod(const char *path,mode_t mode)
@@ -584,7 +582,7 @@ static VALUE unsafe_unlink(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("unlink"),2,wrap_context(ctx),path);
+  return rb_funcall(ctx->private_data,rb_intern("unlink"),2,wrap_context(ctx),path);
 }
 
 static int rf_unlink(const char *path)
@@ -614,7 +612,7 @@ static VALUE unsafe_rmdir(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("rmdir"),2,wrap_context(ctx),path);
+  return rb_funcall(ctx->private_data,rb_intern("rmdir"),2,wrap_context(ctx),path);
 }
 
 static int rf_rmdir(const char *path)
@@ -644,7 +642,7 @@ static VALUE unsafe_symlink(VALUE *args){
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("symlink"),3,wrap_context(ctx),path,as);
+  return rb_funcall(ctx->private_data,rb_intern("symlink"),3,wrap_context(ctx),path,as);
 }
 
 static int rf_symlink(const char *path,const char *as)
@@ -677,7 +675,7 @@ static VALUE unsafe_rename(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("rename"),3,wrap_context(ctx),path,as);
+  return rb_funcall(ctx->private_data,rb_intern("rename"),3,wrap_context(ctx),path,as);
 }
 
 static int rf_rename(const char *path,const char *as)
@@ -710,7 +708,7 @@ static VALUE unsafe_link(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("link"),3,wrap_context(ctx),path,as);
+  return rb_funcall(ctx->private_data,rb_intern("link"),3,wrap_context(ctx),path,as);
 }
 
 static int rf_link(const char *path,const char * as)
@@ -745,7 +743,7 @@ static VALUE unsafe_read(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("read"),5,
+  return rb_funcall(ctx->private_data,rb_intern("read"),5,
         wrap_context(ctx),path,size,offset,ffi);
 }
 
@@ -813,7 +811,7 @@ static VALUE unsafe_write(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("write"),5,
+  return rb_funcall(ctx->private_data,rb_intern("write"),5,
         wrap_context(ctx),path,buffer,offset,ffi);
 }
 
@@ -849,7 +847,7 @@ static VALUE unsafe_statfs(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("statfs"),2,
+  return rb_funcall(ctx->private_data,rb_intern("statfs"),2,
         wrap_context(ctx),path);
 }
 
@@ -888,7 +886,7 @@ static VALUE unsafe_setxattr(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("setxattr"),6,
+  return rb_funcall(ctx->private_data,rb_intern("setxattr"),6,
         wrap_context(ctx),path,name,value,size,flags);
 }
 
@@ -929,7 +927,7 @@ static VALUE unsafe_getxattr(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("getxattr"),4,
+  return rb_funcall(ctx->private_data,rb_intern("getxattr"),4,
         wrap_context(ctx),path,name,size);
 }
 
@@ -972,7 +970,7 @@ static VALUE unsafe_listxattr(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("listxattr"),3,
+  return rb_funcall(ctx->private_data,rb_intern("listxattr"),3,
         wrap_context(ctx),path,size);
 }
 
@@ -1026,7 +1024,7 @@ static VALUE unsafe_removexattr(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("removexattr"),3,
+  return rb_funcall(ctx->private_data,rb_intern("removexattr"),3,
         wrap_context(ctx),path,name);
 }
 
@@ -1059,7 +1057,7 @@ static VALUE unsafe_opendir(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("opendir"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall(ctx->private_data,rb_intern("opendir"),3,wrap_context(ctx),path,ffi);
 }
 
 static int rf_opendir(const char *path,struct fuse_file_info *ffi)
@@ -1091,7 +1089,7 @@ static VALUE unsafe_releasedir(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("releasedir"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall(ctx->private_data,rb_intern("releasedir"),3,wrap_context(ctx),path,ffi);
 }
 
 static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
@@ -1124,7 +1122,7 @@ static VALUE unsafe_fsyncdir(VALUE *args)
 
   struct fuse_context *ctx=fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("fsyncdir"),4,wrap_context(ctx),path,
+  return rb_funcall(ctx->private_data,rb_intern("fsyncdir"),4,wrap_context(ctx),path,
         meta,ffi);
 }
 
@@ -1156,7 +1154,7 @@ static VALUE unsafe_init(VALUE* args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("init"),2,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("init"),2,wrap_context(ctx),
     rfuseconninfo);
 }
 
@@ -1210,7 +1208,7 @@ static VALUE unsafe_destroy(VALUE* args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("destroy"),2,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("destroy"),2,wrap_context(ctx),
     user_data);
 }
 
@@ -1234,7 +1232,7 @@ static VALUE unsafe_access(VALUE* args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("access"),3,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("access"),3,wrap_context(ctx),
     path, mask);
 }
 
@@ -1268,7 +1266,7 @@ static VALUE unsafe_create(VALUE* args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("create"),4,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("create"),4,wrap_context(ctx),
     path, mode, ffi);
 }
 
@@ -1306,7 +1304,7 @@ static VALUE unsafe_ftruncate(VALUE* args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("ftruncate"),4,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("ftruncate"),4,wrap_context(ctx),
     path, size, ffi);
 }
 
@@ -1343,7 +1341,7 @@ static VALUE unsafe_fgetattr(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("fgetattr"),3,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("fgetattr"),3,wrap_context(ctx),
     path,ffi);
 }
 
@@ -1382,7 +1380,7 @@ static VALUE unsafe_lock(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall(fuse_object,rb_intern("lock"),5,wrap_context(ctx),
+  return rb_funcall(ctx->private_data,rb_intern("lock"),5,wrap_context(ctx),
     path,ffi,cmd,lock);
 }
 
@@ -1440,7 +1438,7 @@ static VALUE unsafe_utimens(VALUE *args)
   struct fuse_context *ctx=fuse_get_context();
 
   return rb_funcall(
-    fuse_object,
+    ctx->private_data,
     rb_intern("utimens"),
     4,
     wrap_context(ctx),
@@ -1494,7 +1492,7 @@ static VALUE unsafe_bmap(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall( fuse_object, rb_intern("bmap"), 4, wrap_context(ctx),
+  return rb_funcall( ctx->private_data, rb_intern("bmap"), 4, wrap_context(ctx),
     path, blocksize, idx);
 }
 
@@ -1535,7 +1533,7 @@ static VALUE unsafe_ioctl(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall( fuse_object, rb_intern("ioctl"), 7, wrap_context(ctx),
+  return rb_funcall( ctx->private_data, rb_intern("ioctl"), 7, wrap_context(ctx),
     path, cmd, arg, ffi, flags, data);
 }
 
@@ -1575,7 +1573,7 @@ static VALUE unsafe_poll(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall( fuse_object, rb_intern("poll"), 5, wrap_context(ctx),
+  return rb_funcall( ctx->private_data, rb_intern("poll"), 5, wrap_context(ctx),
     path, ffi, ph, reventsp);
 }
 
@@ -1794,10 +1792,7 @@ static VALUE rf_initialize(
     *kargs = rarray2fuseargs(kernelopts),
     *largs = rarray2fuseargs(libopts);
 
-  intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs);
-
-  //TODO this won't work with multithreading!!!
-  fuse_object=self;
+  intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs,self);
 
   return self;
 }

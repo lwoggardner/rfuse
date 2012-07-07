@@ -24,7 +24,9 @@ int intern_fuse_init(
   struct intern_fuse *inf,
   const char *mountpoint, 
   struct fuse_args *kernelopts,
-  struct fuse_args *libopts)
+  struct fuse_args *libopts,
+  void* user_data
+  )
 {
   struct fuse_chan* fc;
 
@@ -34,7 +36,7 @@ int intern_fuse_init(
     return -1;
   }
 
-  inf->fuse=fuse_new(fc, libopts, &(inf->fuse_op), sizeof(struct fuse_operations), NULL);
+  inf->fuse=fuse_new(fc, libopts, &(inf->fuse_op), sizeof(struct fuse_operations), user_data);
   inf->fc = fc;
 
   if (strlen(inf->mountname) > MOUNTNAME_MAX) {

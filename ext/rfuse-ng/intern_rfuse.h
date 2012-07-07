@@ -17,7 +17,8 @@ int intern_fuse_init(
   struct intern_fuse *inf,
   const char *mountpoint, 
   struct fuse_args *args,
-  struct fuse_args *libopts
+  struct fuse_args *libopts,
+  void* user_data
 );
 
 int intern_fuse_fd(struct intern_fuse *inf);
