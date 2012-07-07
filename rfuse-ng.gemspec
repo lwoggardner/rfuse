@@ -6,8 +6,8 @@ Gem::Specification.new do |s|
   s.name        = "rfuse-ng"
   s.version     = RFuseNG::VERSION
   s.platform    = Gem::Platform::RUBY
-  s.authors     = ["Tamás László Fábián"]
-  s.email       = ["giganetom@gmail.com"]
+  s.authors     = ["Tamás László Fábián", "Grant Gardner"]
+  s.email       = ["grant@lastweekend.com.au"]
   s.homepage    = "http://github.com/tddium/rfuse-ng"
   s.summary     = %q{Ruby language binding for FUSE}
   s.description = %q{Ruby language binding for FUSE. It was forked from rfuse and modified for Ruby 1.9.2.}
@@ -21,4 +21,5 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_development_dependency("rake")
+  s.add_development_dependency("rspec")
 end

@@ -283,7 +283,6 @@ static VALUE unsafe_mkdir(VALUE *args)
   return rb_funcall(fuse_object,rb_intern("mkdir"),3,wrap_context(ctx),path,mode);
 }
 
-//calls getattr with path and expects something like FuseStat back
 static int rf_mkdir(const char *path, mode_t mode)
 {
   VALUE args[2];
@@ -308,13 +307,18 @@ static int rf_mkdir(const char *path, mode_t mode)
 
 static VALUE unsafe_open(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  =  args[1];
+  VALUE funargs[3];
   struct fuse_context *ctx=fuse_get_context();
-  return rb_funcall(fuse_object,rb_intern("open"),3,wrap_context(ctx),path,ffi);
+  funargs[0] = wrap_context(ctx); //ctx
+  funargs[1] = args[0]; //path
+  funargs[2] = args[1]; //ffi
+
+  //Avoid calling the private kernel method "open" which
+  //otherwise prevents delegation by method_missing
+  //#TODO refactor all the API method calls to be like this
+  return rb_funcall3(fuse_object,rb_intern("open"),3,funargs);
 }
 
-//calls getattr with path and expects something like FuseStat back
 static int rf_open(const char *path,struct fuse_file_info *ffi)
 {
   VALUE args[2];
@@ -322,11 +326,11 @@ static int rf_open(const char *path,struct fuse_file_info *ffi)
   int error = 0;
   args[0]=rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
-  //GG: is args[1] kept on the stack and thus referenced from the GC's perspective?
   args[1]=wrap_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_open,(VALUE) args,&error);
   if (error)
   {
+      printf("Open error\n");
     return -(return_error(ENOENT));
   }
   else
