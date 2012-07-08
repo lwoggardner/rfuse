@@ -1,7 +1,9 @@
 #include <fuse.h>
 #include <ruby.h>
 
-VALUE wrap_file_info(struct fuse_file_info *ffi);
+VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi);
+VALUE get_file_info(struct fuse_file_info *ffi);
+VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi);
 
 VALUE file_info_initialize(VALUE self);
 VALUE file_info_new(VALUE class);

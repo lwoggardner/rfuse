@@ -104,7 +104,7 @@ static int rf_readdir(const char *path, void *buf,
   fillerc->buffer=buf;
   args[1]=rfiller_instance;
   args[2]=INT2NUM(offset);
-  args[3]=wrap_file_info(ffi);
+  args[3]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
 
@@ -301,70 +301,79 @@ static int rf_mkdir(const char *path, mode_t mode)
   }
 }
 
+//Every call needs this stuff
+static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const char *path)
+{
+
+  args[0] = ctx->private_data;
+  args[1] = wrap_context(ctx);
+  args[2] = rb_str_new2(path);
+  rb_enc_associate(args[2],rb_filesystem_encoding());
+
+}
 //----------------------OPEN
 
 static VALUE unsafe_open(VALUE *args)
 {
-  VALUE funargs[3];
-  struct fuse_context *ctx=fuse_get_context();
-  funargs[0] = wrap_context(ctx); //ctx
-  funargs[1] = args[0]; //path
-  funargs[2] = args[1]; //ffi
 
-  //Avoid calling the private kernel method "open" which
-  //otherwise prevents delegation by method_missing
   //#TODO refactor all the API method calls to be like this
-  return rb_funcall3(ctx->private_data,rb_intern("open"),3,funargs);
+  //(ie do not invoke private methods)
+  return rb_funcall3(args[0],rb_intern("open"),3,&args[1]);
 }
 
 static int rf_open(const char *path,struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=wrap_file_info(ffi);
+
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+
+  args[3]=wrap_file_info(ctx,ffi);
+
   res=rb_protect((VALUE (*)())unsafe_open,(VALUE) args,&error);
   if (error)
   {
-      printf("Open error\n");
     return -(return_error(ENOENT));
   }
   else
   {
-    if (TYPE(ffi->fh) != T_NONE) {
-       //Make sure the GC doesn't collect our FileHandle
-       rb_gc_register_address((VALUE*) &ffi->fh);
-    }
     return 0;
   }
 }
 
 //----------------------RELEASE
 
+//This method is registered as a default for release in the case when
+//open/create are defined, but a specific release method is not.
+//similarly for opendir/releasedir
+static int rf_release_ffi(const char *path, struct fuse_file_info *ffi)
+{
+  struct fuse_context *ctx=fuse_get_context();
+  
+  release_file_info(ctx,ffi);
+
+}
+
 static VALUE unsafe_release(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("release"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall3(args[0],rb_intern("release"),3,&args[1]);
 }
 
 static int rf_release(const char *path, struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=wrap_file_info(ffi);
+
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+
+  args[3]=release_file_info(ctx,ffi);
+  
   res=rb_protect((VALUE (*)())unsafe_release,(VALUE) args,&error);
-  if (TYPE(ffi->fh) != T_NONE) {
-     rb_gc_unregister_address((VALUE*) &ffi->fh);
-  }
+ 
   if (error)
   {
     return -(return_error(ENOENT));
@@ -396,7 +405,7 @@ static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
   args[0] = rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(datasync);
-  args[2] = wrap_file_info(ffi);
+  args[2] = get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_fsync,(VALUE) args,&error);
 
@@ -429,7 +438,7 @@ static int rf_flush(const char *path,struct fuse_file_info *ffi)
   int error = 0;
   args[0]=rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=wrap_file_info(ffi);
+  args[1]=get_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_flush,(VALUE) args,&error);
 
   if (error)
@@ -775,7 +784,7 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(size);
   args[2]=INT2NUM(offset);
-  args[3]=wrap_file_info(ffi);
+  args[3]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_read,(VALUE) args,&error);
 
@@ -826,7 +835,7 @@ static int rf_write(const char *path,const char *buf,size_t size,
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=rb_str_new(buf, size);
   args[2]=INT2NUM(offset);
-  args[3]=wrap_file_info(ffi);
+  args[3]=get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_write,(VALUE) args, &error);
 
@@ -1052,22 +1061,19 @@ static int rf_removexattr(const char *path,const char *name)
 
 static VALUE unsafe_opendir(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("opendir"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall3(args[0],rb_intern("opendir"),3,&args[1]);
 }
 
 static int rf_opendir(const char *path,struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=wrap_file_info(ffi);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+
+  args[3]=wrap_file_info(ctx,ffi);
+  
   res=rb_protect((VALUE (*)())unsafe_opendir,(VALUE) args,&error);
 
   if (error)
@@ -1084,22 +1090,20 @@ static int rf_opendir(const char *path,struct fuse_file_info *ffi)
 
 static VALUE unsafe_releasedir(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
 
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("releasedir"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall(args[0],rb_intern("releasedir"),3,&args[1]);
 }
 
 static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=wrap_file_info(ffi);
+
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=release_file_info(ctx,ffi);
+  
   res=rb_protect((VALUE (*)())unsafe_releasedir,(VALUE) args,&error);
 
   if (error)
@@ -1134,7 +1138,7 @@ static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
   args[0]=rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1]=INT2NUM(meta);
-  args[2]=wrap_file_info(ffi);
+  args[2]=get_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_fsyncdir,(VALUE) args,&error);
 
   if (error)
@@ -1260,27 +1264,20 @@ static int rf_access(const char *path, int mask)
 
 static VALUE unsafe_create(VALUE* args)
 {
-  VALUE path = args[0];
-  VALUE mode = args[1];
-  VALUE ffi  = args[2];
 
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("create"),4,wrap_context(ctx),
-    path, mode, ffi);
+  return rb_funcall3(args[0],rb_intern("create"),4,&args[1]);
 }
 
-static int rf_create(const char *path, mode_t mode,
-  struct fuse_file_info *ffi)
+static int rf_create(const char *path, mode_t mode, struct fuse_file_info *ffi)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = INT2NUM(mode);
-  args[2] = wrap_file_info(ffi);
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3] = INT2NUM(mode);
+  args[4] = wrap_file_info(ctx,ffi);
 
   res = rb_protect((VALUE (*)())unsafe_create,(VALUE) args,&error);
 
@@ -1318,7 +1315,7 @@ static int rf_ftruncate(const char *path, off_t size,
   args[0] = rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(size);
-  args[2] = wrap_file_info(ffi);
+  args[2] = get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_ftruncate,(VALUE) args,&error);
 
@@ -1354,7 +1351,7 @@ static int rf_fgetattr(const char *path, struct stat *stbuf,
 
   args[0] = rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = wrap_file_info(ffi);
+  args[1] = get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_fgetattr,(VALUE) args,&error);
 
@@ -1411,7 +1408,7 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
 
   args[0] = rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = wrap_file_info(ffi);
+  args[1] = get_file_info(ffi);
   args[2] = INT2NUM(cmd);
   args[3] = locko;
 
@@ -1548,7 +1545,7 @@ static int rf_ioctl(const char *path, int cmd, void *arg,
   rb_enc_associate(args[0],rb_filesystem_encoding());
   args[1] = INT2NUM(cmd);
   args[2] = wrap_buffer(arg);
-  args[3] = wrap_file_info(ffi);
+  args[3] = get_file_info(ffi);
   args[4] = INT2NUM(flags);
   args[5] = wrap_buffer(data);
 
@@ -1586,7 +1583,7 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
 
   args[0] = rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = wrap_file_info(ffi);
+  args[1] = get_file_info(ffi);
   args[2] = wrap_pollhandle(ph);
   args[3] = INT2NUM(*reventsp);
 
@@ -1733,8 +1730,14 @@ static VALUE rf_initialize(
     inf->fuse_op.truncate    = rf_truncate;
   if (RESPOND_TO(self,"utime"))
     inf->fuse_op.utime       = rf_utime;    // Deprecated
-  if (RESPOND_TO(self,"open"))
+  if (RESPOND_TO(self,"open")) {
     inf->fuse_op.open        = rf_open;
+    inf->fuse_op.release     = rf_release_ffi; // remove open file reference
+  }
+  if (RESPOND_TO(self,"create")) {
+    inf->fuse_op.create      = rf_create;
+    inf->fuse_op.release     = rf_release_ffi; // remove open file reference
+  }
   if (RESPOND_TO(self,"read"))
     inf->fuse_op.read        = rf_read;
   if (RESPOND_TO(self,"write"))
@@ -1755,8 +1758,10 @@ static VALUE rf_initialize(
     inf->fuse_op.listxattr   = rf_listxattr;
   if (RESPOND_TO(self,"removexattr"))
     inf->fuse_op.removexattr = rf_removexattr;
-  if (RESPOND_TO(self,"opendir"))
+  if (RESPOND_TO(self,"opendir")) {
     inf->fuse_op.opendir     = rf_opendir;
+    inf->fuse_op.release     = rf_release_ffi; // remove open file reference
+  }
   if (RESPOND_TO(self,"readdir"))
     inf->fuse_op.readdir     = rf_readdir;
   if (RESPOND_TO(self,"releasedir"))
@@ -1769,8 +1774,6 @@ static VALUE rf_initialize(
     inf->fuse_op.destroy     = rf_destroy;
   if (RESPOND_TO(self,"access"))
     inf->fuse_op.access      = rf_access;
-  if (RESPOND_TO(self,"create"))
-    inf->fuse_op.create      = rf_create;
   if (RESPOND_TO(self,"ftruncate"))
     inf->fuse_op.ftruncate   = rf_ftruncate;
   if (RESPOND_TO(self,"fgetattr"))
@@ -1793,6 +1796,10 @@ static VALUE rf_initialize(
     *largs = rarray2fuseargs(libopts);
 
   intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs,self);
+
+  VALUE open_files_hash=rb_hash_new();
+
+  rb_iv_set(self,"@open_files",open_files_hash);
 
   return self;
 }
@@ -1821,6 +1828,6 @@ VALUE rfuse_init(VALUE module)
   rb_define_method(cFuse,"mountname",rf_mountname,0);
   rb_define_method(cFuse,"fd",rf_fd,0);
   rb_define_method(cFuse,"process",rf_process,0);
-
+  rb_attr(cFuse,rb_intern("open_files"),1,0,Qfalse);
   return cFuse;
 }

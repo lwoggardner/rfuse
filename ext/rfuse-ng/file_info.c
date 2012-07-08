@@ -1,32 +1,63 @@
 #include "file_info.h"
 #include <fuse.h>
 
-
-static void file_info_mark(struct fuse_file_info *ffi) {
-  if (TYPE(ffi->fh) != T_NONE) {
-     rb_gc_mark((VALUE) ffi->fh);
-  } 
-}
-
 //creates a FileInfo object from an already allocated ffi
-VALUE wrap_file_info(struct fuse_file_info *ffi) {
+VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi) {
   VALUE rRFuse;
   VALUE rFileInfo;
+  
+  VALUE rffi;
+ 
+  VALUE open_files;
+  VALUE key;
+
   rRFuse=rb_const_get(rb_cObject,rb_intern("RFuse"));
   rFileInfo=rb_const_get(rRFuse,rb_intern("FileInfo"));
-  //TODO GG: we need a mark function here to ensure the ffi-fh value is not GC'd
-  //between open and release
-  return Data_Wrap_Struct(rFileInfo,file_info_mark,0,ffi); //shouldn't be freed!
 
+  rffi = Data_Wrap_Struct(rFileInfo,0,0,ffi);
+
+  //store the wrapped ffi back into the struct so we don't have to keep wrapping it
+  ffi->fh = rffi;
+ 
+  //also store it in an open_files hash on the fuse_object
+  //so it doesn't get GC'd
+  open_files = rb_iv_get(ctx->private_data,"@open_files");
+  key        = rb_funcall(rffi,rb_intern("object_id"),0);
+  rb_hash_aset(open_files,key,rffi);
+
+  return rffi;
 };
 
+//returns a previously wrapped ffi
+VALUE get_file_info(struct fuse_file_info *ffi) {
+    
+  if (TYPE(ffi->fh) == T_DATA )
+      return (VALUE) ffi->fh;
+  else
+      return Qnil;
+  
+};
+
+//Allow the FileInfo object to be GC'd 
+VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
+{
+
+  if (TYPE(ffi->fh) == T_DATA) {
+      VALUE rffi = ffi->fh;
+      VALUE fuse_object = ctx->private_data;
+      VALUE open_files = rb_iv_get(fuse_object,"@open_files");
+      VALUE key = rb_funcall(rffi,rb_intern("object_id"),0);
+      rb_hash_delete(open_files,key);
+  } else {
+      return Qnil;
+  }
+
+}
 
 VALUE file_info_initialize(VALUE self){
   return self;
 }
 
-//TODO GG: This probably needs a free function and be converted to alloc/initialize
-//but this probably never gets called anyway
 //TODO FT: test: this _should_not_ be called, an exception would do the trick :)
 VALUE file_info_new(VALUE class){
   rb_raise(rb_eNotImpError, "new() not implemented (it has no use), and should not be called");
@@ -79,24 +110,6 @@ VALUE file_info_nonseekable_assign(VALUE self,VALUE value) {
    return value;
 }
 
-//fh is possibly a pointer to a ruby object and can be set
-VALUE file_info_fh(VALUE self) {
-   struct fuse_file_info *f;
-   Data_Get_Struct(self,struct fuse_file_info,f);
-  if (TYPE(f->fh) != T_NONE) {
-    return (VALUE) f->fh;
-  } else {
-    return Qnil;
-  }
-}
-
-VALUE file_info_fh_assign(VALUE self,VALUE value) {
-   struct fuse_file_info *f;
-   Data_Get_Struct(self,struct fuse_file_info,f);
-   f->fh = value;
-   return value;
-}
-
 VALUE file_info_init(VALUE module) {
   VALUE cFileInfo=rb_define_class_under(module,"FileInfo",rb_cObject);
   rb_define_alloc_func(cFileInfo,file_info_new);
@@ -107,7 +120,7 @@ VALUE file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"direct=",file_info_direct_assign,1);
   rb_define_method(cFileInfo,"nonseekable",file_info_nonseekable,0);
   rb_define_method(cFileInfo,"nonseekable=",file_info_nonseekable_assign,1);
-  rb_define_method(cFileInfo,"fh",file_info_fh,0);
-  rb_define_method(cFileInfo,"fh=",file_info_fh_assign,1);
+  //Define fh as an attribute
+  rb_attr(cFileInfo,rb_intern("fh"),1,1,Qfalse);
   return cFileInfo;
 }

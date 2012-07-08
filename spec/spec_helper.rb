@@ -37,6 +37,7 @@ module RFuseHelper
         fuse.loop
         pid,result = Process.waitpid2(fpid)
         result.should be_success
+        fuse.open_files.should be_empty()
     end
 end
 #TODO: mkdir /tmp/rfuse-spec, or provide an optional parameter to with_fuse for
