@@ -13,6 +13,7 @@ VALUE context_initialize(VALUE self){
   return self;
 }
 
+//This should never be called!
 VALUE context_new(VALUE class){
   VALUE self;
   struct fuse_context *ctx;

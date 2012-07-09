@@ -12,6 +12,7 @@ struct intern_fuse *intern_fuse_new() {
   return inf;
 }
 
+
 int intern_fuse_destroy(struct intern_fuse *inf){
   //you have to take care, that fuse is unmounted yourself!
   if(inf->fuse)

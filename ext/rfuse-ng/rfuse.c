@@ -1011,14 +1011,11 @@ static int rf_listxattr(const char *path,char *buf,
       } else {
         return -ERANGE;
       }
-      printf("destination: %s,%zd\n",buf,size);
-      printf("source:      %s,%zd\n",rbuf,length);
       return length;
       //TODO optimize,check lenght
     }
     else
     {
-      printf ("not copied: %s, %zd\n",buf,length);
       return length;
     }
   }
@@ -1154,21 +1151,24 @@ static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
 //----------------------INIT
 static VALUE unsafe_init(VALUE* args)
 {
-  VALUE rfuseconninfo = args[0];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("init"),2,wrap_context(ctx),
-    rfuseconninfo);
+  return rb_funcall3(args[0],rb_intern("init"),2,&args[1]);
 }
 
 static void *rf_init(struct fuse_conn_info *conn)
 {
-  VALUE args[1];
+  VALUE args[3];
   VALUE res;
   int error = 0;
+  
+  struct fuse_context *ctx = fuse_get_context();
+
+  VALUE self = ctx->private_data;
+
+  args[0] = self;
+  args[1] = wrap_context(ctx);
 
   //Create a struct for the conn_info
+  //TODO - some of these are writable!
   VALUE s  = rb_const_get(rb_cObject,rb_intern("Struct"));
   VALUE fci = rb_funcall(s,rb_intern("new"),7,
     ID2SYM(rb_intern("proto_major")),
@@ -1190,7 +1190,7 @@ static void *rf_init(struct fuse_conn_info *conn)
     UINT2NUM(conn->want)
   );
 
-  args[0] = fcio;
+  args[2] = fcio;
 
   res = rb_protect((VALUE (*)())unsafe_init,(VALUE) args,&error);
 
@@ -1200,7 +1200,11 @@ static void *rf_init(struct fuse_conn_info *conn)
   }
   else
   {
-    return (void *)res;
+    //This previously was the result of the init call (res)
+    //but it was never made available to any of the file operations
+    //and nothing was done to prevent it from being GC'd so
+    //filesystems would need to have stored it separately anyway
+    return (void *) self;
   }
 }
 
@@ -1208,23 +1212,19 @@ static void *rf_init(struct fuse_conn_info *conn)
 
 static VALUE unsafe_destroy(VALUE* args)
 {
-  VALUE user_data = args[0];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("destroy"),2,wrap_context(ctx),
-    user_data);
+  return rb_funcall3(args[0],rb_intern("destroy"),1,&args[1]);
 }
 
 static void rf_destroy(void *user_data)
 {
-  VALUE args[1];
+  VALUE args[2];
   int error = 0;
 
-  args[0] = (VALUE)user_data;
-
+  struct fuse_context *ctx = fuse_get_context();
+  args[0] = ctx->private_data;
+  args[1] = wrap_context(ctx);
+  
   rb_protect((VALUE (*)())unsafe_destroy,(VALUE) args,&error);
-  // TODO: some kind of logging would be nice here.
 }
 
 //----------------------ACCESS
@@ -1795,7 +1795,11 @@ static VALUE rf_initialize(
     *kargs = rarray2fuseargs(kernelopts),
     *largs = rarray2fuseargs(libopts);
 
-  intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs,self);
+  //Store our fuse object in user_data, this will be returned to use in the
+  //session context
+  void* user_data = self;
+
+  intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs,user_data);
 
   VALUE open_files_hash=rb_hash_new();
 
