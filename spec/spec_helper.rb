@@ -1,5 +1,4 @@
-require 'rfuse-ng'
-
+require 'rfuse'
 
 module RFuseHelper
     # Runs the single threaded fuse loop
