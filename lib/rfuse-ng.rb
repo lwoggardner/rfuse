@@ -44,14 +44,12 @@ module RFuse
         end
     end
 
-    # @param [String] mnt the directory to mount your filesystem at
-    # @param [Array<String>] kernel_opt kernel mount options
-    # @param [Array<String>] lib_op, fuse C library options
     # @param [Object] fuse_obj your filesystem object that responds to fuse methods
-    def initialize(mnt,kernelopt,libopt,fuse_object)
+    # @param [String...] options fuse mount options, including mountpoint
+    def initialize(fuse_object,mountpoint,*options)
       @fuse_delegate = fuse_object
       define_fuse_methods(fuse_object)
-      super(mnt.to_s,kernelopt,libopt)
+      super(mountpoint,options)
     end
     
   end #class FuseDelegator

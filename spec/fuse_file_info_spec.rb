@@ -2,6 +2,8 @@ require 'spec_helper'
 
 describe RFuse::Fuse do
 
+    it "should throw exception for bad options"
+
     it "should list directories" do
          
         mockfs = mock("fuse")
@@ -9,7 +11,6 @@ describe RFuse::Fuse do
         spec_pid = Process.pid
 
         mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi | 
-            puts "Hello World #{path} #{filler} #{offset} #{ffi}"
             filler.push("hello",nil,0)
             filler.push("world",nil,0)
         end

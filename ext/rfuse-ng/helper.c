@@ -54,19 +54,21 @@ struct fuse_args * rarray2fuseargs(VALUE rarray){
 
   Check_Type(rarray, T_ARRAY);
   struct fuse_args *args = malloc(sizeof(struct fuse_args));
-  args->argc      = RARRAY_LEN(rarray);
+  args->argc      = RARRAY_LEN(rarray) + 1;
   args->argv      = malloc((args->argc + 1) * sizeof(char *));
   args->allocated = 1;
 
   int i;
   VALUE v;
 
-  for(i = 0; i < args->argc; i++) {
-    v = RARRAY_PTR(rarray)[i];
-    Check_Type(v, T_STRING);
-    args->argv[i] = strdup(rb_string_value_ptr(&v)); //STR2CSTR(RSTRING(v));
-  }
+  args->argv[0] = strdup("");
+
+  for(i = 0; i < args->argc - 1; i++) {
+      v = RARRAY_PTR(rarray)[i];
+      Check_Type(v, T_STRING);
+      args->argv[i+1] = strdup(rb_string_value_ptr(&v)); //STR2CSTR(RSTRING(v));
+                                      }
   args->argv[args->argc] = NULL;
-  
+                        
   return args;
 }

@@ -1636,7 +1636,7 @@ VALUE rf_unmount(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  fuse_unmount(inf->mountname, inf->fc);
+  fuse_unmount(inf->mountpoint, inf->fc);
   return Qnil;
 }
 
@@ -1646,8 +1646,7 @@ VALUE rf_mountname(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  //TODO: GG assume this mount name should also have filesystem encoding
-  VALUE result = rb_str_new2(inf->mountname);
+  VALUE result = rb_str_new2(inf->mountpoint);
   rb_enc_associate(result,rb_filesystem_encoding());
 
   return result;
@@ -1692,15 +1691,16 @@ VALUE rf_process(VALUE self)
 static VALUE rf_initialize(
   VALUE self,
   VALUE mountpoint,
-  VALUE kernelopts,
-  VALUE libopts)
+  VALUE opts)
 {
-  Check_Type(mountpoint, T_STRING);
-  Check_Type(kernelopts, T_ARRAY);
-  Check_Type(libopts, T_ARRAY);
+  Check_Type(mountpoint,T_STRING);
+  Check_Type(opts, T_ARRAY);
 
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
+
+  //TODO: encode to rb_filesystem_encoding()
+  inf->mountpoint = strdup(StringValueCStr(mountpoint));
 
   if (RESPOND_TO(self,"getattr"))
     inf->fuse_op.getattr     = rf_getattr;
@@ -1791,19 +1791,18 @@ static VALUE rf_initialize(
     inf->fuse_op.poll        = rf_poll;
 */
 
-  struct fuse_args
-    *kargs = rarray2fuseargs(kernelopts),
-    *largs = rarray2fuseargs(libopts);
+  //Create the open files hash where we cache FileInfo objects
+  VALUE open_files_hash=rb_hash_new();
+  rb_iv_set(self,"@open_files",open_files_hash);
+
+  struct fuse_args *args = rarray2fuseargs(opts);
+
 
   //Store our fuse object in user_data, this will be returned to use in the
   //session context
   void* user_data = self;
 
-  intern_fuse_init(inf, STR2CSTR(mountpoint), kargs, largs,user_data);
-
-  VALUE open_files_hash=rb_hash_new();
-
-  rb_iv_set(self,"@open_files",open_files_hash);
+  intern_fuse_init(inf, args, user_data);
 
   return self;
 }
@@ -1823,12 +1822,13 @@ VALUE rfuse_init(VALUE module)
 
   rb_define_alloc_func(cFuse,rf_new);
 
-  rb_define_method(cFuse,"initialize",rf_initialize,3);
+  rb_define_method(cFuse,"initialize",rf_initialize,2);
   rb_define_method(cFuse,"loop",rf_loop,0);
   rb_define_method(cFuse,"loop_mt",rf_loop_mt,0); //TODO: multithreading
   rb_define_method(cFuse,"exit",rf_exit,0);
   rb_define_method(cFuse,"invalidate",rf_invalidate,1);
   rb_define_method(cFuse,"unmount",rf_unmount,0);
+  //TODO: alias :mountname :mountpoint
   rb_define_method(cFuse,"mountname",rf_mountname,0);
   rb_define_method(cFuse,"fd",rf_fd,0);
   rb_define_method(cFuse,"process",rf_process,0);

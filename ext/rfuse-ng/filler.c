@@ -28,22 +28,10 @@ VALUE rfiller_push(VALUE self, VALUE name, VALUE stat, VALUE offset) {
   return self;
 }
 
-VALUE rfiller_push_old(VALUE self, VALUE name, VALUE type, VALUE inode) {
-  printf("Called rfilter_push_old\n");
-  struct filler_t *f;
-  Data_Get_Struct(self,struct filler_t,f);
-  // TODO: architecture dependent int types
-  printf("Before df\n");
-  f->df(f->dh, STR2CSTR(name), NUM2INT(type), NUM2INT(inode));
-  printf("After df\n");
-  return self;
-}
-
 VALUE rfiller_init(VALUE module) {
   VALUE cFiller=rb_define_class_under(module,"Filler",rb_cObject);
   rb_define_alloc_func(cFiller,rfiller_new);
   rb_define_method(cFiller,"initialize",rfiller_initialize,0);
   rb_define_method(cFiller,"push",rfiller_push,3);
-  rb_define_method(cFiller,"push_old",rfiller_push_old,3);
   return cFiller;
 }

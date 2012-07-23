@@ -11,6 +11,5 @@ struct filler_t {
 VALUE rfiller_initialize(VALUE self);
 VALUE rfiller_new(VALUE class);
 VALUE rfiller_push(VALUE self, VALUE name, VALUE stat, VALUE offset);
-VALUE rfiller_push_old(VALUE self, VALUE name, VALUE type, VALUE inode);
 
 VALUE rfiller_init(VALUE module);

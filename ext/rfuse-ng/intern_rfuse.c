@@ -17,34 +17,32 @@ int intern_fuse_destroy(struct intern_fuse *inf){
   //you have to take care, that fuse is unmounted yourself!
   if(inf->fuse)
     fuse_destroy(inf->fuse);
+  if(inf->mountpoint)
+     free(inf->mountpoint);
   free(inf);
   return 0;
 }
 
 int intern_fuse_init(
   struct intern_fuse *inf,
-  const char *mountpoint, 
-  struct fuse_args *kernelopts,
-  struct fuse_args *libopts,
+  struct fuse_args *args,
   void* user_data
   )
 {
   struct fuse_chan* fc;
+  int res;                                       
 
-  fc = fuse_mount(mountpoint, kernelopts);
+  char* mountpoint;
+  mountpoint = inf->mountpoint;
+  fc = fuse_mount(mountpoint,args);
 
   if (fc == NULL) {
     return -1;
   }
 
-  inf->fuse=fuse_new(fc, libopts, &(inf->fuse_op), sizeof(struct fuse_operations), user_data);
+  inf->fuse=fuse_new(fc, args, &(inf->fuse_op), sizeof(struct fuse_operations), user_data);
   inf->fc = fc;
 
-  if (strlen(inf->mountname) > MOUNTNAME_MAX) {
-    return -1;
-  }
-
-  strncpy(inf->mountname, mountpoint, MOUNTNAME_MAX);
   return 0;
 }
 

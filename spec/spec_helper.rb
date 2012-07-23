@@ -1,22 +1,6 @@
 require 'rfuse-ng'
 
 
-class RFuseDelegator < RFuse::Fuse
-    def initialize(mountpoint,kernel_opts,lib_opts,delegate)
-        @delegate = delegate
-        super(mountpoint,kernel_opts,lib_opts)
-    end
-
-    def respond_to_missing?(method,priv=false)
-        @delegate.respond_to?(method) 
-    end
-
-    def method_missing(method,*args)
-        puts("Delegator calling #{method}(#{args.inspect})")
-        @delegate.send(method,*args)
-    end
-end
-
 module RFuseHelper
     # Runs the single threaded fuse loop
     # on a pre configured mock fuse filesystem
@@ -33,7 +17,7 @@ module RFuseHelper
             end
         }
 
-        fuse = RFuseDelegator.new(mnt,[],[],mockfs)
+        fuse = RFuse::FuseDelegator.new(mockfs,mnt,"-odebug")
         fuse.loop
         pid,result = Process.waitpid2(fpid)
         result.should be_success
