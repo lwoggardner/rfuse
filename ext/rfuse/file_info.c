@@ -110,7 +110,18 @@ VALUE file_info_nonseekable_assign(VALUE self,VALUE value) {
    return value;
 }
 
-VALUE file_info_init(VALUE module) {
+/*
+   Document-class: RFuse::FileInfo
+
+   Represents an open file (or directory) that is reused
+   across multiple fuse operations
+
+*/
+void file_info_init(VALUE module) {
+#if 0
+    //Trick Yardoc
+    module = rb_define_module("RFuse");
+#endif
   VALUE cFileInfo=rb_define_class_under(module,"FileInfo",rb_cObject);
   rb_define_alloc_func(cFileInfo,file_info_new);
   rb_define_method(cFileInfo,"initialize",file_info_initialize,0);
@@ -120,7 +131,10 @@ VALUE file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"direct=",file_info_direct_assign,1);
   rb_define_method(cFileInfo,"nonseekable",file_info_nonseekable,0);
   rb_define_method(cFileInfo,"nonseekable=",file_info_nonseekable_assign,1);
-  //Define fh as an attribute
-  rb_attr(cFileInfo,rb_intern("fh"),1,1,Qfalse);
+  
+  /*
+     Filehandle - can be any ruby object
+  */
+  rb_define_attr(cFileInfo,"fh",1,1);
   return cFileInfo;
 }

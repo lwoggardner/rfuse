@@ -65,6 +65,22 @@ static int return_error(int def_error)
 
 //----------------------READDIR
 
+/*
+ @overload readdir(context,path,filler,offset,ffi)
+ @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#0f634deda31d1e1c42664585ae820076 readdir}
+ 
+ List contents of a directory
+
+ @param [Context] context
+ @param [String] path
+ @param [Filler] filler
+ @param [Fixnum] offset
+ @param [FileInfo] ffi 
+
+ @return [void]
+ @raise [Errno] 
+
+*/
 static VALUE unsafe_readdir(VALUE *args)
 {
   VALUE path   = args[0];
@@ -78,7 +94,6 @@ static VALUE unsafe_readdir(VALUE *args)
         offset,ffi);
 }
 
-//call readdir with an Filler object
 static int rf_readdir(const char *path, void *buf,
   fuse_fill_dir_t filler, off_t offset,struct fuse_file_info *ffi)
 {
@@ -90,12 +105,11 @@ static int rf_readdir(const char *path, void *buf,
   struct filler_t *fillerc;
   int error = 0;
 
-  //create a filler object
   args[0]=rb_str_new2(path);
   rb_enc_associate(args[0],rb_filesystem_encoding());
 
+  //create a filler object
   fuse_module = rb_const_get(rb_cObject, rb_intern("RFuse"));
-
   rfiller_class=rb_const_get(fuse_module,rb_intern("Filler"));
   rfiller_instance=rb_funcall(rfiller_class,rb_intern("new"),0);
   Data_Get_Struct(rfiller_instance,struct filler_t,fillerc);
@@ -1600,8 +1614,11 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
   return 0;
 }
 
-//----------------------LOOP
-
+/*
+   Main single-threaded loop. Once started no other Ruby threads will run, including
+   signal handlers etc..  Will only exit when the filesystem is unmounted externally
+   (eg with fusermount -u)
+*/
 static VALUE rf_loop(VALUE self)
 {
   struct intern_fuse *inf;
@@ -1610,8 +1627,10 @@ static VALUE rf_loop(VALUE self)
   return Qnil;
 }
 
-//----------------------LOOP_MT
-
+/*
+   Calls the multi-threaded fuse loop
+   Here for completeness - it will not work!!
+*/
 static VALUE rf_loop_mt(VALUE self)
 {
   struct intern_fuse *inf;
@@ -1620,8 +1639,9 @@ static VALUE rf_loop_mt(VALUE self)
   return Qnil;
 }
 
-//----------------------EXIT
-
+/* 
+   Exit fuse - only useful if you are using #process rather than #loop
+*/
 VALUE rf_exit(VALUE self)
 {
   struct intern_fuse *inf;
@@ -1630,8 +1650,9 @@ VALUE rf_exit(VALUE self)
   return Qnil;
 }
 
-//----------------------UNMOUNT
-
+/*
+   Unmount fuse - only useful if you are using #process rather than #loop
+*/
 VALUE rf_unmount(VALUE self)
 {
   struct intern_fuse *inf;
@@ -1640,8 +1661,9 @@ VALUE rf_unmount(VALUE self)
   return Qnil;
 }
 
-//----------------------MOUNTNAME
-
+/* 
+   @return [String] directory where this filesystem is mounted
+*/
 VALUE rf_mountname(VALUE self)
 {
   struct intern_fuse *inf;
@@ -1652,8 +1674,9 @@ VALUE rf_mountname(VALUE self)
   return result;
 }
 
-//----------------------INVALIDATE
-
+/* 
+  @deprecated obsolete in FUSE itself
+*/
 VALUE rf_invalidate(VALUE self,VALUE path)
 {
   struct intern_fuse *inf;
@@ -1661,8 +1684,9 @@ VALUE rf_invalidate(VALUE self,VALUE path)
   return fuse_invalidate(inf->fuse,STR2CSTR(path)); //TODO: check if str?
 }
 
-//----------------------FD
-// Return /dev/fuse file descriptor for use with IO.select
+/*
+   @return [Integer] /dev/fuse file descriptor for use with IO.select and #process
+*/
 VALUE rf_fd(VALUE self)
 {
  struct intern_fuse *inf;
@@ -1670,9 +1694,10 @@ VALUE rf_fd(VALUE self)
  return INT2NUM(intern_fuse_fd(inf));
 }
 
-//----------------------PROCESS
-// Process one fuse command from the kernel
-// returns < 0 if we're not mounted.. won't be this simple in a mt scenario
+/*
+ Process one fuse command from the kernel
+ @return [Integer] < 0 if we're not mounted..
+*/
 VALUE rf_process(VALUE self)
 {
  struct intern_fuse *inf;
@@ -1686,8 +1711,11 @@ VALUE rf_process(VALUE self)
     1, rb_str_new2(methodname) \
   ) == Qtrue
 
-//-------------RUBY
-
+/*
+* initialize and mount the filesystem
+* @param [String] mountpoint The mountpoint
+* @param [Array<String>] options fuse arguments (-h to see a list)
+*/
 static VALUE rf_initialize(
   VALUE self,
   VALUE mountpoint,
@@ -1816,8 +1844,21 @@ static VALUE rf_new(VALUE class)
   return self;
 }
 
-VALUE rfuse_init(VALUE module)
+/*
+* Document-class: RFuse::Fuse
+* A FUSE filesystem - extend this class implementing
+* the various abstract methods to provide your filesystem.
+*
+* All file operations take a {Context} and a path as well as any other necessary parameters
+* 
+* Mount your filesystem by creating an instance of your subclass and call #loop to begin processing
+*/
+void rfuse_init(VALUE module)
 {
+#if 0
+    //Trick Yardoc
+    module = rb_define_module("RFuse");
+#endif
   VALUE cFuse=rb_define_class_under(module,"Fuse",rb_cObject);
 
   rb_define_alloc_func(cFuse,rf_new);
@@ -1828,10 +1869,14 @@ VALUE rfuse_init(VALUE module)
   rb_define_method(cFuse,"exit",rf_exit,0);
   rb_define_method(cFuse,"invalidate",rf_invalidate,1);
   rb_define_method(cFuse,"unmount",rf_unmount,0);
-  //TODO: alias :mountname :mountpoint
   rb_define_method(cFuse,"mountname",rf_mountname,0);
+  rb_define_alias(cFuse,"mountpoint","mountname");
   rb_define_method(cFuse,"fd",rf_fd,0);
   rb_define_method(cFuse,"process",rf_process,0);
   rb_attr(cFuse,rb_intern("open_files"),1,0,Qfalse);
-  return cFuse;
+
+#if 0
+  //Trick Yarddoc into documenting abstract fuseoperations
+  rb_define_method(cFuse,"readdir",unsafe_readdir,0);
+#endif
 }

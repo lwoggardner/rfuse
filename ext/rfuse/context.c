@@ -9,6 +9,9 @@ VALUE wrap_context (struct fuse_context *fctx) {
   return Data_Wrap_Struct(rContext,0,0,fctx); //shouldn't be freed!
 }
 
+/*
+   @api private
+*/
 VALUE context_initialize(VALUE self){
   return self;
 }
@@ -21,23 +24,42 @@ VALUE context_new(VALUE class){
   return self;
 }
 
+/*
+   @return [Integer] User id of the caller
+*/
 VALUE context_uid(VALUE self){
   struct fuse_context *ctx;
   Data_Get_Struct(self,struct fuse_context,ctx);
   return INT2FIX(ctx->uid);
 }
+
+/*
+   @return [Integer] Group id of the caller
+*/
 VALUE context_gid(VALUE self){
   struct fuse_context *ctx;
   Data_Get_Struct(self,struct fuse_context,ctx);
   return INT2FIX(ctx->gid);
 }
+
+/*
+   @return [Integer] Process id of the calling process
+*/
 VALUE context_pid(VALUE self){
   struct fuse_context *ctx;
   Data_Get_Struct(self,struct fuse_context,ctx);
   return INT2FIX(ctx->pid);
 }
 
-VALUE context_init(VALUE module) {
+/*
+   Document-class:  RFuse::Context
+   Context object passed to every fuse operation
+*/
+void context_init(VALUE module) {
+#if 0
+    module = rb_define_module("RFuse");
+#endif
+
   VALUE cContext=rb_define_class_under(module,"Context",rb_cObject);
   rb_define_alloc_func(cContext,context_new);
   rb_define_method(cContext,"initialize",context_initialize,0);

@@ -1,3 +1,3 @@
 #include <ruby.h>
 
-VALUE rfuse_init(VALUE module);
+void rfuse_init(VALUE module);

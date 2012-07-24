@@ -10,4 +10,4 @@ VALUE file_info_new(VALUE class);
 VALUE file_info_flags(VALUE self);
 VALUE file_info_writepage(VALUE self);
 
-VALUE file_info_init(VALUE module);
+void file_info_init(VALUE module);

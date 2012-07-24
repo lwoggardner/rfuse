@@ -2,4 +2,4 @@
 #include <ruby.h>
 
 VALUE wrap_context ();
-VALUE context_init(VALUE module);
+void context_init(VALUE module);

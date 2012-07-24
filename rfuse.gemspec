@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Grant Gardner"]
   s.email       = ["grant@lastweekend.com.au"]
-  s.homepage    = "http://github.com/lwoggardner/rfuse-ng"
+  s.homepage    = "http://rubygems.org/gems/rfuse"
   s.summary     = %q{Ruby language binding for FUSE}
   s.description = %q{Ruby language binding for FUSE. It was forked from rfuse and modified for Ruby 1.9.2.}
 
@@ -20,4 +20,6 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency("rake")
   s.add_development_dependency("rspec")
+  s.add_development_dependency("yard")
+  s.add_development_dependency("redcarpet")
 end

@@ -6,6 +6,9 @@ VALUE rfiller_initialize(VALUE self){
   return self;
 }
 
+/*
+* @api private Never called
+*/
 VALUE rfiller_new(VALUE class){
   VALUE self;
   struct filler_t *f;
@@ -13,25 +16,45 @@ VALUE rfiller_new(VALUE class){
   return self;
 }
 
+/*
+ * Add a value into the filler 
+ * @param [String] name a file name
+ * @param [Stat] stat Stat info representing the file, may be nil
+ * @param [Integer] offset index of next entry, or zero
+ * 
+ * @return self or nil if the buffer is full
+ * 
+ */
 VALUE rfiller_push(VALUE self, VALUE name, VALUE stat, VALUE offset) {
   struct filler_t *f;
   Data_Get_Struct(self,struct filler_t,f);
   //Allow nil return instead of a stat
+
+  int result;
+
   if (NIL_P(stat)) {
-    f->filler(f->buffer,STR2CSTR(name),NULL,NUM2LONG(offset));
+    result = f->filler(f->buffer,STR2CSTR(name),NULL,NUM2LONG(offset));
   } else {
     struct stat st;
     memset(&st, 0, sizeof(st));
     rstat2stat(stat,&st);
-    f->filler(f->buffer,STR2CSTR(name),&st,NUM2LONG(offset));
+    result = f->filler(f->buffer,STR2CSTR(name),&st,NUM2LONG(offset));
   }
-  return self;
+
+  return result ? Qnil : self;
 }
 
-VALUE rfiller_init(VALUE module) {
+/*
+* Document-class: RFuse::Filler
+* Used by {Fuse#readdir} to collect directory entries
+*/
+void rfiller_init(VALUE module) {
+
+#if 0
+  module = rb_define_module("RFuse");
+#endif
   VALUE cFiller=rb_define_class_under(module,"Filler",rb_cObject);
   rb_define_alloc_func(cFiller,rfiller_new);
   rb_define_method(cFiller,"initialize",rfiller_initialize,0);
   rb_define_method(cFiller,"push",rfiller_push,3);
-  return cFiller;
 }

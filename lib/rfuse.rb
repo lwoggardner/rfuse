@@ -2,6 +2,7 @@ require 'fcntl'
 require 'rfuse/version'
 require 'rfuse/rfuse'
 
+# Ruby FUSE (Filesystem in USErspace) binding
 module RFuse
 
   #This class is useful to make your filesystem implementation
@@ -21,6 +22,20 @@ module RFuse
                      :init, :destroy, :access, :ftruncate, :fgetattr, :lock,
                      :utimens, :bmap, :ioctl, :poll ]
    
+    # @param [Object] fuse_object your filesystem object that responds to fuse methods
+    # @param [String] mountpoint existing directory where the filesystem will be mounted
+    # @param [String...] options fuse mount options (use "-h" to see a list)
+    # 
+    # Create and mount a filesystem
+    #
+    # If ruby debug is enabled then each call to fuse_object will be represented on $stderr
+    def initialize(fuse_object,mountpoint,*options)
+      @fuse_delegate = fuse_object
+      define_fuse_methods(fuse_object)
+      super(mountpoint,options)
+    end
+   
+    private
     def define_fuse_methods(fuse_object)
         #Wrap all the rfuse methods in a context block
         FUSE_METHODS.each do |method|
@@ -44,17 +59,10 @@ module RFuse
         end
     end
 
-    # @param [Object] fuse_obj your filesystem object that responds to fuse methods
-    # @param [String...] options fuse mount options, including mountpoint
-    def initialize(fuse_object,mountpoint,*options)
-      @fuse_delegate = fuse_object
-      define_fuse_methods(fuse_object)
-      super(mountpoint,options)
-    end
-    
   end #class FuseDelegator
 
   # Helper class to return from :getattr method
+  # All attributes are Integers and default to 0
   class Stat
     S_IFMT   = 0170000 # Format mask
     S_IFDIR  = 0040000 # Directory.  
@@ -78,7 +86,7 @@ module RFuse
     def self.file(mode=0,values = { })
       return self.new(S_IFREG,mode,values)
     end
-    
+
     attr_accessor :uid,:gid,:mode,:size,:atime,:mtime,:ctime
     attr_accessor :dev,:ino,:nlink,:rdev,:blksize,:blocks
     
@@ -92,6 +100,7 @@ module RFuse
   end
   
   # Helper class to return from :statfs (eg for df output)
+  # All attributes are Integers and default to 0
   class StatVfs
     attr_accessor :f_bsize,:f_frsize,:f_blocks,:f_bfree,:f_bavail
     attr_accessor :f_files,:f_ffree,:f_favail,:f_fsid,:f_flag,:f_namemax
