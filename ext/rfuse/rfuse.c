@@ -24,6 +24,9 @@
 #include "bufferwrapper.h"
 
 
+static VALUE empty_string;
+static VALUE null_string;
+
 static int unsafe_return_error(VALUE *args)
 {
  
@@ -63,8 +66,14 @@ static int return_error(int def_error)
   }
 }
 
-//----------------------READDIR
-
+//Every call needs this stuff
+static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const char *path)
+{
+  args[0] = ctx->private_data;
+  args[1] = wrap_context(ctx);
+  args[2] = rb_str_new2(path);
+  rb_enc_associate(args[2],rb_filesystem_encoding());
+}
 /*
  @overload readdir(context,path,filler,offset,ffi)
  @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#0f634deda31d1e1c42664585ae820076 readdir}
@@ -79,19 +88,10 @@ static int return_error(int def_error)
 
  @return [void]
  @raise [Errno] 
-
 */
 static VALUE unsafe_readdir(VALUE *args)
 {
-  VALUE path   = args[0];
-  VALUE filler = args[1];
-  VALUE offset = args[2];
-  VALUE ffi    = args[3];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("readdir"),5,wrap_context(ctx),path,filler,
-        offset,ffi);
+  return rb_funcall3(args[0],rb_intern("readdir"),5,&args[1]);
 }
 
 static int rf_readdir(const char *path, void *buf,
@@ -100,13 +100,13 @@ static int rf_readdir(const char *path, void *buf,
   VALUE fuse_module;
   VALUE rfiller_class;
   VALUE rfiller_instance;
-  VALUE args[4];
-  VALUE res;
   struct filler_t *fillerc;
+  VALUE args[6];
+  VALUE res;
   int error = 0;
-
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
 
   //create a filler object
   fuse_module = rb_const_get(rb_cObject, rb_intern("RFuse"));
@@ -116,9 +116,9 @@ static int rf_readdir(const char *path, void *buf,
 
   fillerc->filler=filler;//Init the filler by hand.... TODO: cleaner
   fillerc->buffer=buf;
-  args[1]=rfiller_instance;
-  args[2]=INT2NUM(offset);
-  args[3]=get_file_info(ffi);
+  args[3]=rfiller_instance;
+  args[4]=INT2NUM(offset);
+  args[5]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
 
@@ -132,26 +132,32 @@ static int rf_readdir(const char *path, void *buf,
   }
 }
 
-//----------------------READLINK
+/*
+   Resolve target of symbolic link 
+   @overload readlink(context,path,size)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#b4ce6e6d69dfde3ec550f22d932c5633 readlink}
+   @param [Context] context
+   @param [String] path
+   @param [Integer] size if the resolved path is greater than this size it should be truncated
 
+   @return [String] the resolved link path
+   @raise [Errno]
+*/
 static VALUE unsafe_readlink(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE size = args[1];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("readlink"),3,wrap_context(ctx),path,size);
+  return rb_funcall3(args[0],rb_intern("readlink"),3,&args[1]);
 }
 
 static int rf_readlink(const char *path, char *buf, size_t size)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2NUM(size);
+  
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=INT2NUM(size);
   char *rbuf;
   res=rb_protect((VALUE (*)())unsafe_readlink,(VALUE)args,&error);  
   if (error)
@@ -166,19 +172,13 @@ static int rf_readlink(const char *path, char *buf, size_t size)
   }
 }
 
-//----------------------GETDIR
-
+/*
+  @deprecated see {#readdir}
+  @abstract Fuse operation getdir
+*/
 static VALUE unsafe_getdir(VALUE *args)
 {
-  VALUE path   = args[0];
-  VALUE filler = args[1];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(
-    ctx->private_data,rb_intern("getdir"),3,
-    wrap_context(ctx),path,filler
-  );
+  return rb_funcall3(args[0],rb_intern("getdir"),3,&args[1]);
 }
 
 //call getdir with an Filler object
@@ -187,17 +187,16 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
   VALUE fuse_module;
   VALUE rfiller_class;
   VALUE rfiller_instance;
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   struct filler_t *fillerc;
   int error = 0;
 
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
   //create a filler object
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-
   fuse_module = rb_const_get(rb_cObject, rb_intern("RFuse"));
-
   rfiller_class    = rb_const_get(fuse_module,rb_intern("Filler"));
   rfiller_instance = rb_funcall(rfiller_class,rb_intern("new"),0);
 
@@ -206,7 +205,7 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
   fillerc->df = df;
   fillerc->dh = dh;
 
-  args[1]=rfiller_instance;
+  args[3]=rfiller_instance;
 
   res = rb_protect((VALUE (*)())unsafe_getdir, (VALUE)args, &error);
 
@@ -220,26 +219,42 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
   }
 }
 
-//----------------------MKNOD
+/*
+   Create a file node
+   @overload mknod(context,path,mode,dev)
+   @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1465eb2268cec2bb5ed11cb09bbda42f mknod}
 
+   @param [Context] context
+   @param [String] path
+   @param [Integer] mode  type & permissions
+   @param [Integer] major
+   @param [Integer] minor
+
+   This is called for creation of all non-directory, non-symlink nodes. If the filesystem defines {#create}, then for regular files that will be called instead.
+
+*/
 static VALUE unsafe_mknod(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE mode = args[1];
-  VALUE dev  = args[2];
-  struct fuse_context *ctx=fuse_get_context();
-  return rb_funcall(ctx->private_data,rb_intern("mknod"),4,wrap_context(ctx),path,mode,dev);
+  return rb_funcall3(args[0],rb_intern("mknod"),5,&args[1]);
 }
 
 static int rf_mknod(const char *path, mode_t mode,dev_t dev)
 {
-  VALUE args[3];
+  VALUE args[6];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2FIX(mode);
-  args[2]=INT2FIX(dev);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+ 
+  int major;
+  int minor;
+
+  major = MAJOR(dev);
+  minor = MINOR(dev);
+
+  args[3]=INT2FIX(mode);
+  args[4]=INT2FIX(major);
+  args[5]=INT2FIX(minor);
   res=rb_protect((VALUE (*)())unsafe_mknod,(VALUE) args,&error);
   if (error)
   {
@@ -251,25 +266,32 @@ static int rf_mknod(const char *path, mode_t mode,dev_t dev)
   }
 }
 
-//----------------------GETATTR
+/*
+   Get file attributes.
+   @overload getattr(context,path)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#7a4c5d8eaf7179d819618c0cf3f73724 getattr}
+   @param [Context] context
+   @param [String] path
 
+   @return [Stat] or something that quacks like a stat
+   @raise [Errno]
+
+   Similar to stat(). The 'st_dev' and 'st_blksize' fields are ignored. The 'st_ino' field is ignored except if the 'use_ino' mount option is given.
+*/
 static VALUE unsafe_getattr(VALUE *args)
 {
-  VALUE path = args[0];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("getattr"),2,wrap_context(ctx),path);
+  return rb_funcall3(args[0],rb_intern("getattr"),2,&args[1]);
 }
 
 //calls getattr with path and expects something like FuseStat back
 static int rf_getattr(const char *path, struct stat *stbuf)
 {
-  VALUE args[1];
+  VALUE args[3];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
   res=rb_protect((VALUE (*)())unsafe_getattr,(VALUE) args,&error);
 
   if (error || (res == Qnil))
@@ -283,26 +305,35 @@ static int rf_getattr(const char *path, struct stat *stbuf)
   }
 }
 
-//----------------------MKDIR
+/*
+   Create a directory
 
+   @overload mkdir(context,path,mode)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#0a38aa6ca60e945772d5d21b0c1c8916 mkdir}
+   
+   @param [Context] context
+   @param [String] path
+   @param [Integer] mode to obtain correct directory permissions use mode | {Stat.S_IFDIR}
+
+   @return [void]
+   @raise [Errno]
+   
+*/
 static VALUE unsafe_mkdir(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE mode = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("mkdir"),3,wrap_context(ctx),path,mode);
+  return rb_funcall3(args[0],rb_intern("mkdir"),3,&args[1]);
 }
 
 static int rf_mkdir(const char *path, mode_t mode)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2FIX(mode);
+  
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=INT2FIX(mode);
   res=rb_protect((VALUE (*)())unsafe_mkdir,(VALUE) args,&error);
 
   if (error)
@@ -315,23 +346,24 @@ static int rf_mkdir(const char *path, mode_t mode)
   }
 }
 
-//Every call needs this stuff
-static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const char *path)
-{
+/*
+  File open operation
 
-  args[0] = ctx->private_data;
-  args[1] = wrap_context(ctx);
-  args[2] = rb_str_new2(path);
-  rb_enc_associate(args[2],rb_filesystem_encoding());
+  @overload open(context,path,ffi)
+  @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#14b98c3f7ab97cc2ef8f9b1d9dc0709d open}
+  @param [Context] context
+  @param [String] path
+  @param [FileInfo] ffi
+     file open flags etc.
+     The fh attribute may be used to store an arbitrary filehandle object which will be passed to all subsequent operations on this file
 
-}
-//----------------------OPEN
+  @raise [Errno::ENOPERM] if user is not permitted to open the file
+  @raise [Errno] for other errors
 
+  @return [void]
+*/
 static VALUE unsafe_open(VALUE *args)
 {
-
-  //#TODO refactor all the API method calls to be like this
-  //(ie do not invoke private methods)
   return rb_funcall3(args[0],rb_intern("open"),3,&args[1]);
 }
 
@@ -357,8 +389,6 @@ static int rf_open(const char *path,struct fuse_file_info *ffi)
   }
 }
 
-//----------------------RELEASE
-
 //This method is registered as a default for release in the case when
 //open/create are defined, but a specific release method is not.
 //similarly for opendir/releasedir
@@ -370,6 +400,21 @@ static int rf_release_ffi(const char *path, struct fuse_file_info *ffi)
 
 }
 
+/*
+  Release an open file
+
+  @overload release(context,path,ffi)
+  @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#bac8718cdfc1ee273a44831a27393419 release}
+  @param [Context] context
+  @param [String] path
+  @param [FileInfo] ffi
+
+  @return [void] 
+
+  Release is called when there are no more references to an open file: all file descriptors are closed and all memory mappings are unmapped.
+
+  For every {#open} call there will be exactly one {#release} call with the same flags and file descriptor. It is possible to have a file opened more than once, in which case only the last release will mean, that no more reads/writes will happen on the file.
+*/
 static VALUE unsafe_release(VALUE *args)
 {
   return rb_funcall3(args[0],rb_intern("release"),3,&args[1]);
@@ -398,28 +443,35 @@ static int rf_release(const char *path, struct fuse_file_info *ffi)
   }
 }
 
-//----------------------FSYNC
+/*
+   Synchronize file contents
+
+   @overload fsync(context,path,datasync,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#92bdd6f43ba390a54ac360541c56b528 fsync}
+  
+   @param [Context] context
+   @param [String] path
+   @param [Integer] datasync if non-zero, then only user data should be flushed, not the metadata
+   @param [FileInfo] ffi
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_fsync(VALUE *args) {
-  VALUE path     = args[0];
-  VALUE datasync = args[1];
-  VALUE ffi      = args[2];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("fsync"), 4, wrap_context(ctx),
-    path, datasync, ffi);
+  return rb_funcall3(args[0],rb_intern("fsync"),4,&args[1]);
 }
 
 static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = INT2NUM(datasync);
-  args[2] = get_file_info(ffi);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3] = INT2NUM(datasync);
+  args[4] = get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_fsync,(VALUE) args,&error);
 
@@ -433,372 +485,400 @@ static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
   }
 }
 
-//----------------------FLUSH
 
+
+/*
+   Possibly flush cached data
+
+   @overload flush(context,path,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#d4ec9c309072a92dd82ddb20efa4ab14 flush}
+  
+   @param [Context] context
+   @param [String] path
+   @param [FileInfo] ffi
+
+   @return [void]
+   @raise [Errno]
+
+   BIG NOTE: This is not equivalent to fsync(). It's not a request to sync dirty data.
+
+   Flush is called on each close() of a file descriptor. So if a filesystem wants to return write errors in close() and the file has cached dirty data, this is a good place to write back data and return any errors. Since many applications ignore close() errors this is not always useful.
+
+NOTE: The flush() method may be called more than once for each open(). This happens if more than one file descriptor refers to an opened file due to dup(), dup2() or fork() calls. It is not possible to determine if a flush is final, so each flush should be treated equally. Multiple write-flush sequences are relatively rare, so this shouldn't be a problem.
+
+Filesystems shouldn't assume that flush will always be called after some writes, or that if will be called at all.
+*/
 static VALUE unsafe_flush(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("flush"),3,wrap_context(ctx),path,ffi);
+  return rb_funcall3(args[0],rb_intern("flush"),3,&args[1]);
 }
 
 static int rf_flush(const char *path,struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=get_file_info(ffi);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=get_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_flush,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------TRUNCATE
+/*
+   Change the size of a file
 
+   @overload truncate(context,path,offset)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#8efb50b9cd975ba8c4c450248caff6ed truncate}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] offset
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_truncate(VALUE *args)
 {
-  VALUE path   = args[0];
-  VALUE offset = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("truncate"),3,wrap_context(ctx),path,offset);
+  return rb_funcall3(args[0],rb_intern("truncate"),3,&args[1]);
 }
 
 static int rf_truncate(const char *path,off_t offset)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2FIX(offset);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=INT2FIX(offset);
   res=rb_protect((VALUE (*)())unsafe_truncate,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------UTIME
 
+/*
+   Change access/modification times of a file
+
+   @overload utime(context,path,actime,modtime)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#cb7452acad1002d418409892b6e54c2e utime}
+   @deprecated See {#utimens}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] actime access time
+   @param [Integer] modtime modification time
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_utime(VALUE *args)
 {
-  VALUE path    = args[0];
-  VALUE actime  = args[1];
-  VALUE modtime = args[2];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("utime"),4,wrap_context(ctx),path,actime,modtime);
+  return rb_funcall3(args[0],rb_intern("utime"),4,&args[1]);
 }
 
 static int rf_utime(const char *path,struct utimbuf *utim)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2NUM(utim->actime);
-  args[2]=INT2NUM(utim->modtime);
+  
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=INT2NUM(utim->actime);
+  args[4]=INT2NUM(utim->modtime);
   res=rb_protect((VALUE (*)())unsafe_utime,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------CHOWN
+/*
+   Change file ownership
 
+   @overload chown(context,path,uid,gid)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#40421f8a43e903582c49897894f4692d chown}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] uid new user id
+   @param [Integer] gid new group id
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_chown(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE uid  = args[1];
-  VALUE gid  = args[2];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("chown"),4,wrap_context(ctx),path,uid,gid);
+  return rb_funcall3(args[0],rb_intern("chown"),4,&args[1]);
 }
 
 static int rf_chown(const char *path,uid_t uid,gid_t gid)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2FIX(uid);
-  args[2]=INT2FIX(gid);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=INT2FIX(uid);
+  args[4]=INT2FIX(gid);
   res=rb_protect((VALUE (*)())unsafe_chown,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------CHMOD
+/*
+   Change file permissions
 
+   @overload chmod(context,path,mode)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#7e75d299efe3a401e8473af7028e5cc5 chmod}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] mode
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_chmod(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE mode = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("chmod"),3,wrap_context(ctx),path,mode);
+  return rb_funcall3(args[0],rb_intern("chmod"),3,&args[1]);
 }
 
 static int rf_chmod(const char *path,mode_t mode)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2FIX(mode);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=INT2FIX(mode);
   res=rb_protect((VALUE (*)())unsafe_chmod,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------UNLINK
+/*
+   Remove a file
 
+   @overload unlink(context,path)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#8bf63301a9d6e94311fa10480993801e unlink}
+
+   @param [Context] context
+   @param [String] path
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_unlink(VALUE *args)
 {
-  VALUE path = args[0];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("unlink"),2,wrap_context(ctx),path);
+  return rb_funcall3(args[0],rb_intern("unlink"),2,&args[1]);
 }
 
 static int rf_unlink(const char *path)
 {
-  VALUE args[1];
+  VALUE args[3];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
   res=rb_protect((VALUE (*)())unsafe_unlink,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------RMDIR
+/*
+   Remove a directory
 
+   @overload rmdir(context,path)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#c59578d18db12f0142ae1ab6e8812d55 rmdir}
+
+   @param [Context] context
+   @param [String] path
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_rmdir(VALUE *args)
 {
-  VALUE path = args[0];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("rmdir"),2,wrap_context(ctx),path);
+  return rb_funcall3(args[0],rb_intern("rmdir"),2,&args[1]);
 }
 
 static int rf_rmdir(const char *path)
 {
-  VALUE args[1];
+  VALUE args[3];
   VALUE res;
   int error = 0;
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
   res = rb_protect((VALUE (*)())unsafe_rmdir, (VALUE) args ,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------SYMLINK
+/*
+   Create a symbolic link
 
+   @overload symlink(context,to,from)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#b86022391e56a8ad3211cf754b5b5ebe symlink}
+
+   @param [Context] context
+   @param [String] to
+   @param [String] from
+
+   @return [void]
+   @raise [Errno]
+
+   Create a symbolic link named "from" which, when evaluated, will lead to "to". 
+*/
 static VALUE unsafe_symlink(VALUE *args){
-  VALUE path = args[0];
-  VALUE as   = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("symlink"),3,wrap_context(ctx),path,as);
+  return rb_funcall3(args[0],rb_intern("symlink"),3,&args[1]);
 }
 
 static int rf_symlink(const char *path,const char *as)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new2(as);
-  rb_enc_associate(args[1],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=rb_str_new2(as);
+  rb_enc_associate(args[3],rb_filesystem_encoding());
+  
   res=rb_protect((VALUE (*)())unsafe_symlink,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------RENAME
+/*
+   @overload rename(context,from,to)
 
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#a777cbddc91887b117ac414e9a2d3cb5 rename}
+
+   @param [Context] context
+   @param [String] from
+   @param [String] to
+
+   @return [void]
+   @raise [Errno]
+
+   Rename the file, directory, or other object "from" to the target "to". Note that the source and target don't have to be in the same directory, so it may be necessary to move the source to an entirely new directory. See rename(2) for full details.
+*/
 static VALUE unsafe_rename(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE as   = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("rename"),3,wrap_context(ctx),path,as);
+  return rb_funcall3(args[0],rb_intern("rename"),3,&args[1]);
 }
 
 static int rf_rename(const char *path,const char *as)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new2(as);
-  rb_enc_associate(args[1],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+
+  args[3]=rb_str_new2(as);
+  rb_enc_associate(args[3],rb_filesystem_encoding());
+  
   res=rb_protect((VALUE (*)())unsafe_rename,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------LINK
 
+/*
+   Create a hard link to file
+   @overload link(context,from,to)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1b234c43e826c6a690d80ea895a17f61 link}
+
+   @param [Context] context
+   @param [String] from
+   @param [String] to
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_link(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE as   = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("link"),3,wrap_context(ctx),path,as);
+  return rb_funcall3(args[0],rb_intern("link"),3,&args[1]);
 }
 
 static int rf_link(const char *path,const char * as)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new2(as);
-  rb_enc_associate(args[1],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=rb_str_new2(as);
+  rb_enc_associate(args[3],rb_filesystem_encoding());
   res=rb_protect((VALUE (*)())unsafe_link,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------READ
 
+/*
+   Read data from an open file
+
+   @overload read(context,path,size,offset,ffi)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#2a1c6b4ce1845de56863f8b7939501b5 read}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] size
+   @param [Integer] offset
+   @param [FileInfo] ffi
+
+   @return [String] should be exactly the number of bytes requested, or empty string on EOF
+   @raise [Errno]
+*/
 static VALUE unsafe_read(VALUE *args)
 {
-  VALUE path   = args[0];
-  VALUE size   = args[1];
-  VALUE offset = args[2];
-  VALUE ffi    = args[3];
+  VALUE res;
+  
+  res = rb_funcall3(args[0],rb_intern("read"),5,&args[1]);
 
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("read"),5,
-        wrap_context(ctx),path,size,offset,ffi);
+  return StringValue(res);
 }
 
 
-
-char*
-rb_str2cstr(str, len)
-    VALUE str;
-    long *len;
+long rb_strcpy(VALUE str, char *buf, size_t size)
 {
-    StringValue(str);
-    if (len) *len = RSTRING_LEN(str);
-    else if (RTEST(ruby_verbose) &&  RSTRING_LEN(str) != ((long)strlen(RSTRING_PTR(str))) )  {
-	rb_warn("string contains \\0 character");
-    }
-    return RSTRING_PTR(str);
-}
+    long length;
 
+    length = RSTRING_LEN(str);
+
+    if (length <= (long) size)
+    { 
+        memcpy(buf,RSTRING_PTR(str),length);
+    }
+
+    return length;
+}
 
 static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct fuse_file_info *ffi)
 {
-  VALUE args[4];
+  VALUE args[6];
   VALUE res;
   int error = 0;
   long length=0;
   char* rbuf;
 
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2NUM(size);
-  args[2]=INT2NUM(offset);
-  args[3]=get_file_info(ffi);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=INT2NUM(size);
+  args[4]=INT2NUM(offset);
+  args[5]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_read,(VALUE) args,&error);
 
@@ -808,48 +888,53 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
   }
   else
   {
-    length = NUM2LONG(rb_funcall(res, rb_intern("length"), 0));
-    rbuf = rb_str2cstr(res, &length);
-    if (length<=(long)size)
-    {
-      memcpy(buf,rbuf,length);
-      return length;
-    }
-    else
-    {
+   
+   length = rb_strcpy(res,buf,size);
+
+   if (length <= (long) size) {
+       return length;
+   } else {
       //This cannot happen => IO error.
       return -(return_error(ENOENT));
-    }
+   }    
+
   }
 }
 
-//----------------------WRITE
 
+/*
+   Write data to an open file
+
+   @overload write(context,path,size,offset,ffi)
+
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#897d1ece4b8b04c92d97b97b2dbf9768 write}
+
+   @param [Context] context
+   @param [String] path
+   @param [String] data
+   @param [Integer] offset
+   @param [FileInfo] ffi
+
+   @return [Integer] exactly the number of bytes written except on error
+   @raise [Errno]
+*/
 static VALUE unsafe_write(VALUE *args)
 {
-  VALUE path   = args[0];
-  VALUE buffer = args[1];
-  VALUE offset = args[2];
-  VALUE ffi    = args[3];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("write"),5,
-        wrap_context(ctx),path,buffer,offset,ffi);
+  return rb_funcall3(args[0],rb_intern("write"),5,&args[1]);
 }
 
 static int rf_write(const char *path,const char *buf,size_t size,
   off_t offset,struct fuse_file_info *ffi)
 {
-  VALUE args[4];
+  VALUE args[6];
   VALUE res;
   int error = 0;
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
 
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new(buf, size);
-  args[2]=INT2NUM(offset);
-  args[3]=get_file_info(ffi);
+  args[3]=rb_str_new(buf, size);
+  args[4]=INT2NUM(offset);
+  args[5]=get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_write,(VALUE) args, &error);
 
@@ -863,15 +948,23 @@ static int rf_write(const char *path,const char *buf,size_t size,
   }
 }
 
-//----------------------STATFS
+/*
+   Get file system statistics
+
+   @overload statfs(context,path)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#4e765e29122e7b6b533dc99849a52655 statfs}
+   @param [Context] context
+   @param [String] path
+
+   @return [StatVfs] or something that quacks like a statVfs
+   @raise [Errno]
+
+   The 'f_frsize', 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
+
+*/
 static VALUE unsafe_statfs(VALUE *args)
 {
-  VALUE path = args[0];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("statfs"),2,
-        wrap_context(ctx),path);
+  return rb_funcall3(args[0],rb_intern("statfs"),2,&args[1]);
 }
 
 static int rf_statfs(const char * path, struct statvfs * vfsinfo)
@@ -880,8 +973,8 @@ static int rf_statfs(const char * path, struct statvfs * vfsinfo)
   VALUE res;
   int error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
 
   res = rb_protect((VALUE (*)())unsafe_statfs,(VALUE) args,&error);
 
@@ -896,76 +989,81 @@ static int rf_statfs(const char * path, struct statvfs * vfsinfo)
   }
 }
 
-//----------------------SETXATTR
 
+/*
+   Set extended attributes 
+
+   @overload setxattr(context,path,name,data,flags)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#988ced7091c2821daa208e6c96d8b598 setxattr}
+   @param [Context] context
+   @param [String] path
+   @param [String] name
+   @param [String] data
+   @param [Integer] flags
+
+   @return [void]
+   @raise [Errno]
+
+*/
 static VALUE unsafe_setxattr(VALUE *args)
 {
-
-  VALUE path  = args[0];
-  VALUE name  = args[1];
-  VALUE value = args[2];
-  VALUE size  = args[3];
-  VALUE flags = args[4];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("setxattr"),6,
-        wrap_context(ctx),path,name,value,size,flags);
+  return rb_funcall3(args[0],rb_intern("setxattr"),5,&args[1]);
 }
 
 static int rf_setxattr(const char *path,const char *name,
            const char *value, size_t size, int flags)
 {
-  VALUE args[5];
+  VALUE args[6];
   VALUE res;
   int error = 0;
 
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  //TODO GG: Should the name and values be encoded as well?
-  args[1]=rb_str_new2(name);
-  args[2]=rb_str_new(value,size);
-  args[3]=INT2NUM(size);
-  args[4]=INT2NUM(flags);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=rb_str_new2(name);
+  args[4]=rb_str_new(value,size);
+  args[5]=INT2NUM(flags);
 
   res=rb_protect((VALUE (*)())unsafe_setxattr,(VALUE) args,&error);
-
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
-//----------------------GETXATTR
 
+/*
+   Get extended attribute 
+
+   @overload getxattr(context,path,name)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#e21503c64fe2990c8a599f5ba339a8f2 getxattr}
+   @param [Context] context
+   @param [String] path
+   @param [String] name
+
+   @return [String] attribute value
+   @raise [Errno]
+
+*/
 static VALUE unsafe_getxattr(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE name = args[1];
-  VALUE size = args[2];
+  VALUE res;
+  res = rb_funcall3(args[0],rb_intern("getxattr"),3,&args[1]);
 
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("getxattr"),4,
-        wrap_context(ctx),path,name,size);
+  return StringValue(res);
 }
 
 static int rf_getxattr(const char *path,const char *name,char *buf,
            size_t size)
 {
-  VALUE args[3];
+  VALUE args[4];
   VALUE res;
   char *rbuf;
   long length = 0;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new2(name);
-  args[2]=INT2NUM(size);
+ 
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  args[3]=rb_str_new2(name);
   res=rb_protect((VALUE (*)())unsafe_getxattr,(VALUE) args,&error);
 
   if (error)
@@ -974,102 +1072,103 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   }
   else
   {
-    rbuf=rb_str2cstr(res,&length); //TODO protect this, too
-    if (buf != NULL)
-    {
-      memcpy(buf,rbuf,length); //First call is just to get the length
-      //TODO optimize
-    }
-    return length;
+    return rb_strcopy(res,buf,size);
   }
 }
 
-//----------------------LISTXATTR
+/*
+   List extended attributes
 
+   @overload listxattr(context,path)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#b4a9c361ce48406f07d5a08ab03f5de8 listxattr}
+   @param [Context] context
+   @param [String] path
+
+   @return [Array<String>] list of attribute names
+   @raise [Errno]
+*/
 static VALUE unsafe_listxattr(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE size = args[1];
+  VALUE res;
+  res = rb_funcall3(args[0],rb_intern("listxattr"),2,&args[1]);
 
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("listxattr"),3,
-        wrap_context(ctx),path,size);
+  //We'll let Ruby do the hard work of creating a String
+  //separated by NULLs
+  Check_Type(res,T_ARRAY);
+  rb_ary_push(res,empty_string);
+  return rb_ary_join(res,null_string);
 }
 
-static int rf_listxattr(const char *path,char *buf,
-           size_t size)
+static int rf_listxattr(const char *path,char *buf, size_t size)
 {
-  VALUE args[2];
+  VALUE args[3];
   VALUE res;
   char *rbuf;
   size_t length =0;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2NUM(size);
+  
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
   res=rb_protect((VALUE (*)())unsafe_listxattr,(VALUE) args,&error);
 
   if (error)
   {
     return -(return_error(ENOENT));
   }
-  else
-  {
-    rbuf=rb_str2cstr(res,(long *)&length); //TODO protect this, too
-    if (buf != NULL)
-    {
-      if (length<=size)
-      {
-        memcpy(buf,rbuf,length); //check for size
-      } else {
-        return -ERANGE;
-      }
-      return length;
-      //TODO optimize,check lenght
-    }
-    else
-    {
-      return length;
-    }
+  else {
+    return rb_strcpy(res,buf,size);
   }
 }
 
-//----------------------REMOVEXATTR
 
+/*
+   Remove extended attribute
+
+   @overload removexattr(context,path,name)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#5e54de801a0e0d7019e4579112ecc477 removexattr}
+   @param [Context] context
+   @param [String] path
+   @param [String] name attribute to remove
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_removexattr(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE name = args[1];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("removexattr"),3,
-        wrap_context(ctx),path,name);
+  return rb_funcall3(args[0],rb_intern("removexattr"),3,&args[1]);
 }
 
 static int rf_removexattr(const char *path,const char *name)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=rb_str_new2(name);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=rb_str_new2(name);
   res=rb_protect((VALUE (*)())unsafe_removexattr,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------OPENDIR
 
+/*
+   Open directory
+
+   @overload opendir(context,path,name)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1813889bc5e6e0087a936b7abe8b923f opendir}
+   @param [Context] context
+   @param [String] path
+   @param [FileInfo] ffi
+
+   @return [void]
+   @raise [Errno]
+
+
+   Unless the 'default_permissions' mount option is given, this method should check if opendir is permitted for this directory. Optionally opendir may also return an arbitrary filehandle in the fuse_file_info structure, which will be available to {#readdir},  {#fsyncdir}, {#releasedir}.
+
+*/
 static VALUE unsafe_opendir(VALUE *args)
 {
   return rb_funcall3(args[0],rb_intern("opendir"),3,&args[1]);
@@ -1087,18 +1186,21 @@ static int rf_opendir(const char *path,struct fuse_file_info *ffi)
   
   res=rb_protect((VALUE (*)())unsafe_opendir,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------RELEASEDIR
+/*
+   Release directory
 
+   @overload releasedir(context,path,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#729e53d36acc05a7a8985a1a3bbfac1e releasedir}
+   @param [Context] context
+   @param [String] path
+   @param [FileInfo] ffi
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_releasedir(VALUE *args)
 {
 
@@ -1117,52 +1219,54 @@ static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
   
   res=rb_protect((VALUE (*)())unsafe_releasedir,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------FSYNCDIR
 
+/*
+   Sync directory
+
+   @overload fsyncdir(context,path,datasync,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#ba5cc1fe9a63ec152ceb19656f243256 fsyncdir}
+   @param [Context] context
+   @param [String] path
+   @param [Integer] datasync  if nonzero sync only data, not metadata
+   @param [FileInfo] ffi
+
+   @return [void]
+   @raise [Errno]
+
+*/
 static VALUE unsafe_fsyncdir(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE meta = args[1];
-  VALUE ffi  = args[2];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("fsyncdir"),4,wrap_context(ctx),path,
-        meta,ffi);
+  return rb_funcall(args[0],rb_intern("fsyncdir"),4,&args[1]);
 }
 
 static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
-  args[0]=rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1]=INT2NUM(meta);
-  args[2]=get_file_info(ffi);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3]=INT2NUM(meta);
+  args[4]=get_file_info(ffi);
   res=rb_protect((VALUE (*)())unsafe_fsyncdir,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------INIT
+/*
+   Called when filesystem is initialised
+
+   @overload init(info)
+   @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#dc6dc71274f185de72217e38d62142c4 init}
+
+   @param [Context] context
+   @param [Struct] info connection information
+
+   @return [void]
+*/
 static VALUE unsafe_init(VALUE* args)
 {
   return rb_funcall3(args[0],rb_intern("init"),2,&args[1]);
@@ -1222,8 +1326,18 @@ static void *rf_init(struct fuse_conn_info *conn)
   }
 }
 
-//----------------------DESTROY
+/*
+   Cleanup filesystem
 
+   @overload destroy()
+   @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#c41d37ab860204fe4bd7612f9fb036c5 destroy}
+
+   @param [Context] context
+
+   @return [void]
+
+   Called at filesystem exit
+*/
 static VALUE unsafe_destroy(VALUE* args)
 {
   return rb_funcall3(args[0],rb_intern("destroy"),1,&args[1]);
@@ -1241,44 +1355,56 @@ static void rf_destroy(void *user_data)
   rb_protect((VALUE (*)())unsafe_destroy,(VALUE) args,&error);
 }
 
-//----------------------ACCESS
+/*
+   Check access permissions
 
+   @overload access(context,path,mode)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#2248db35e200265f7fb9a18348229858 access}
+   @param [Context] context
+   @param [String] path
+   @param [Integer] mode the permissions to check
+
+   @return [void]
+   @raise [Errno::EACCESS] if the requested permission isn't available
+
+*/
 static VALUE unsafe_access(VALUE* args)
 {
-  VALUE path = args[0];
-  VALUE mask = args[1];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("access"),3,wrap_context(ctx),
-    path, mask);
+  return rb_funcall3(args[0],rb_intern("access"),3,&args[1]);
 }
 
 static int rf_access(const char *path, int mask)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = INT2NUM(mask);
+  struct fuse_context *ctx=fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3] = INT2NUM(mask);
   res = rb_protect((VALUE (*)())unsafe_access,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------CREATE
 
+/*
+   Create and open a file
+
+   @overload create(context,path,mode,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#97243e0f9268a96236bc3b6f2bacee17 create}
+   @param [Context] context
+   @param [String] path
+   @param [Integer] mode the file permissions to create
+   @param [Fileinfo] ffi - use the {FileInfo#fh} attribute to store a filehandle
+
+   @return [void]
+   @raise [Errno]
+
+   If the file does not exist, first create it with the specified mode, and then open it.
+
+*/
 static VALUE unsafe_create(VALUE* args)
 {
-
   return rb_funcall3(args[0],rb_intern("create"),4,&args[1]);
 }
 
@@ -1295,77 +1421,75 @@ static int rf_create(const char *path, mode_t mode, struct fuse_file_info *ffi)
 
   res = rb_protect((VALUE (*)())unsafe_create,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
+
 }
 
-//----------------------FTRUNCATE
 
+/*
+   Change the size of an open file
+
+   @overload ftruncate(context,path,size,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1e492882859740f13cbf3344cf963c70 ftruncate}
+   @param [Context] context
+   @param [String] path
+   @param [Integer] size
+   @param [Fileinfo] ffi 
+
+   @return [void]
+   @raise [Errno] 
+
+*/
 static VALUE unsafe_ftruncate(VALUE* args)
 {
-  VALUE path = args[0];
-  VALUE size = args[1];
-  VALUE ffi  = args[2];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("ftruncate"),4,wrap_context(ctx),
-    path, size, ffi);
+  return rb_funcall3(args[0],rb_intern("ftruncate"),4,&args[1]);
 }
 
 static int rf_ftruncate(const char *path, off_t size,
   struct fuse_file_info *ffi)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = INT2NUM(size);
-  args[2] = get_file_info(ffi);
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3] = INT2NUM(size);
+  args[4] = get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_ftruncate,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------FGETATTR
 
+/*
+   Get attributes of an open file
+
+   @overload fgetattr(context,path,ffi)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#573d79862df591c98e1685225a4cd3a5 fgetattr}
+   @param [Context] context
+   @param [String] path
+   @param [Fileinfo] ffi 
+
+   @return [Stat] file attributes
+   @raise [Errno] 
+
+*/
 static VALUE unsafe_fgetattr(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("fgetattr"),3,wrap_context(ctx),
-    path,ffi);
+  return rb_funcall3(args[0],rb_intern("fgetattr"),3,&args[1]);
 }
 
-static int rf_fgetattr(const char *path, struct stat *stbuf,
-  struct fuse_file_info *ffi)
+static int rf_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *ffi)
 {
-  VALUE args[2];
+  VALUE args[4];
   VALUE res;
   int error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = get_file_info(ffi);
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3] = get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_fgetattr,(VALUE) args,&error);
 
@@ -1380,27 +1504,48 @@ static int rf_fgetattr(const char *path, struct stat *stbuf,
   }
 }
 
-//----------------------LOCK
+/*
+   Perform POSIX file locking operation
 
+   @overload lock(context,path,ffi,cmd,flock)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1c3fff5cf0c1c2003d117e764b9a76fd lock}
+   @param [Context] context
+   @param [String] path
+   @param [Fileinfo] ffi 
+   @param [Integer] cmd
+   @param [Struct] flock
+
+   @return [void]
+   @raise [Errno] 
+
+   The cmd argument will be either F_GETLK, F_SETLK or F_SETLKW.
+
+   For the meaning of fields in 'struct flock' see the man page for fcntl(2). The l_whence field will always be set to SEEK_SET.
+
+   For checking lock ownership, the {FileInfo#owner} argument must be used.
+
+   For F_GETLK operation, the library will first check currently held locks, and if a conflicting lock is found it will return information without calling this method. This ensures, that for local locks the l_pid field is correctly filled in. The results may not be accurate in case of race conditions and in the presence of hard links, but it's unlikly that an application would rely on accurate GETLK results in these cases. If a conflicting lock is not found, this method will be called, and the filesystem may fill out l_pid by a meaningful value, or it may leave this field zero.
+
+   For F_SETLK and F_SETLKW the l_pid field will be set to the pid of the process performing the locking operation.
+
+Note: if this method is not implemented, the kernel will still allow file locking to work locally. Hence it is only interesting for network filesystems and similar.
+*/
 static VALUE unsafe_lock(VALUE *args)
 {
-  VALUE path = args[0];
-  VALUE ffi  = args[1];
-  VALUE cmd  = args[2];
-  VALUE lock = args[3];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall(ctx->private_data,rb_intern("lock"),5,wrap_context(ctx),
-    path,ffi,cmd,lock);
+  return rb_funcall3(args[0],rb_intern("lock"),5,&args[1]);
 }
 
 static int rf_lock(const char *path, struct fuse_file_info *ffi,
   int cmd, struct flock *lock)
 {
-  VALUE args[4];
+  VALUE args[6];
   VALUE res;
   int error = 0;
+
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  
+  //TODO Wrap the struct flock so these attributes can be set
 
   //Create a struct for the lock structure
   VALUE s  = rb_const_get(rb_cObject,rb_intern("Struct"));
@@ -1420,61 +1565,53 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
     UINT2NUM(lock->l_pid)
   );
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = get_file_info(ffi);
-  args[2] = INT2NUM(cmd);
-  args[3] = locko;
+  args[3] = get_file_info(ffi);
+  args[4] = INT2NUM(cmd);
+  args[5] = locko;
 
   res = rb_protect((VALUE (*)())unsafe_lock,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------UTIMENS
 
+/*
+   Change access/modification times of a file
+
+   @overload utimens(context,path,actime,modtime)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#79955861cc5eb006954476607ef28944 utimens}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] actime access time in nanoseconds
+   @param [Integer] modtime modification time in nanoseconds
+
+   @return [void]
+   @raise [Errno]
+*/
 static VALUE unsafe_utimens(VALUE *args)
 {
-  VALUE path    = args[0];
-  VALUE actime  = args[1];
-  VALUE modtime = args[2];
-
-  struct fuse_context *ctx=fuse_get_context();
-
-  return rb_funcall(
-    ctx->private_data,
-    rb_intern("utimens"),
-    4,
-    wrap_context(ctx),
-    path,actime,modtime
-  );
+  return rb_funcall3(args[0],rb_intern("utimens"),4,&args[1]);
 }
 
 static int rf_utimens(const char * path, const struct timespec tv[2])
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int   error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
 
   // tv_sec * 1000000 + tv_nsec
-  args[1] = rb_funcall(
+  args[3] = rb_funcall(
     rb_funcall(
       INT2NUM(tv[0].tv_sec), rb_intern("*"), 1, INT2NUM(1000000)
     ),
     rb_intern("+"), 1, INT2NUM(tv[0].tv_nsec)
   );
 
-  args[2] = rb_funcall(
+  args[4] = rb_funcall(
     rb_funcall(
       INT2NUM(tv[1].tv_sec), rb_intern("*"), 1, INT2NUM(1000000)
     ),
@@ -1482,41 +1619,41 @@ static int rf_utimens(const char * path, const struct timespec tv[2])
   );
   
   res = rb_protect((VALUE (*)())unsafe_utimens,(VALUE) args, &error);
-
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-//----------------------BMAP
+/*
+   Map block index within file to block index within device
 
+   @overload bmap(context,path,blocksize,index)
+   @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#e3f3482e33a0eada0292350d76b82901 bmap}
+
+   @param [Context] context
+   @param [String] path
+   @param [Integer] blocksize
+   @param [Integer] index
+
+   @return [Integer] device relative block index
+   @raise [Errno]
+
+
+   Note: This makes sense only for block device backed filesystems mounted with the 'blkdev' option
+*/
 static VALUE unsafe_bmap(VALUE *args)
 {
-  VALUE path      = args[0];
-  VALUE blocksize = args[1];
-  VALUE idx       = args[2];
-
-  struct fuse_context *ctx = fuse_get_context();
-
-  return rb_funcall( ctx->private_data, rb_intern("bmap"), 4, wrap_context(ctx),
-    path, blocksize, idx);
+  return rb_funcall3(args[0],rb_intern("bmap"),4,&args[1]);
 }
 
 static int rf_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
-  VALUE args[3];
+  VALUE args[5];
   VALUE res;
   int   error = 0;
 
-  args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
-  args[1] = INT2NUM(blocksize);
-  args[2] = LL2NUM(*idx);
+  struct fuse_context *ctx = fuse_get_context();
+  init_context_path_args(args,ctx,path);
+  args[3] = INT2NUM(blocksize);
+  args[4] = LL2NUM(*idx);
 
   res = rb_protect((VALUE (*)())unsafe_bmap,(VALUE) args, &error);
 
@@ -1526,7 +1663,7 @@ static int rf_bmap(const char *path, size_t blocksize, uint64_t *idx)
   }
   else
   {
-    *idx = NUM2LL(args[2]);
+    *idx = NUM2LL(res);
     return 0;
   }
 }
@@ -1630,6 +1767,10 @@ static VALUE rf_loop(VALUE self)
 /*
    Calls the multi-threaded fuse loop
    Here for completeness - it will not work!!
+
+   TODO: probably need to manually deal with the global interpreter lock
+   ie, give it up before calling fuse_loop_mt, and acquiring it around each
+   fuse operation
 */
 static VALUE rf_loop_mt(VALUE self)
 {
@@ -1875,8 +2016,46 @@ void rfuse_init(VALUE module)
   rb_define_method(cFuse,"process",rf_process,0);
   rb_attr(cFuse,rb_intern("open_files"),1,0,Qfalse);
 
+  null_string = rb_str_new("\0",1);
+  empty_string = rb_str_new2("");
+
 #if 0
   //Trick Yarddoc into documenting abstract fuseoperations
   rb_define_method(cFuse,"readdir",unsafe_readdir,0);
+  rb_define_method(cFuse,"readlink",unsafe_readlink,0);
+  rb_define_method(cFuse,"getdir",unsafe_getdir,0);
+  rb_define_method(cFuse,"mknod",unsafe_mknod,0);
+  rb_define_method(cFuse,"getattr",unsafe_getattr,0);
+  rb_define_method(cFuse,"mkdir",unsafe_mkdir,0);
+  rb_define_method(cFuse,"open",unsafe_open,0);
+  rb_define_method(cFuse,"release",unsafe_release,0);
+  rb_define_method(cFuse,"fsync",unsafe_fsync,0);
+  rb_define_method(cFuse,"flush",unsafe_flush,0);
+  rb_define_method(cFuse,"truncate",unsafe_truncate,0);
+  rb_define_method(cFuse,"utime",unsafe_utime,0);
+  rb_define_method(cFuse,"chown",unsafe_chown,0);
+  rb_define_method(cFuse,"chmod",unsafe_chmod,0);
+  rb_define_method(cFuse,"unlink",unsafe_unlink,0);
+  rb_define_method(cFuse,"symlink",unsafe_symlink,0);
+  rb_define_method(cFuse,"rename",unsafe_rename,0);
+  rb_define_method(cFuse,"link",unsafe_link,0);
+  rb_define_method(cFuse,"read",unsafe_read,0);
+  rb_define_method(cFuse,"write",unsafe_write,0);
+  rb_define_method(cFuse,"statfs",unsafe_statfs,0);
+  rb_define_method(cFuse,"setxattr",unsafe_setxattr,0);
+  rb_define_method(cFuse,"getxattr",unsafe_getxattr,0);
+  rb_define_method(cFuse,"listxattr",unsafe_listxattr,0);
+  rb_define_method(cFuse,"removexattr",unsafe_removexattr,0);
+  rb_define_method(cFuse,"opendir",unsafe_opendir,0);
+  rb_define_method(cFuse,"releasedir",unsafe_releasedir,0);
+  rb_define_method(cFuse,"fsyncdir",unsafe_fsyncdir,0);
+  rb_define_method(cFuse,"init",unsafe_init,0);
+  rb_define_method(cFuse,"access",unsafe_access,0);
+  rb_define_method(cFuse,"create",unsafe_create,0);
+  rb_define_method(cFuse,"ftruncate",unsafe_ftruncate,0);
+  rb_define_method(cFuse,"fgetattr",unsafe_fgetattr,0);
+  rb_define_method(cFuse,"lock",unsafe_lock,0);
+  rb_define_method(cFuse,"utimens",unsafe_utimens,0);
+  rb_define_method(cFuse,"bmap",unsafe_bmap,0);
 #endif
 }
