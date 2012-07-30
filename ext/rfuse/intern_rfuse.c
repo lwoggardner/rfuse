@@ -41,6 +41,11 @@ int intern_fuse_init(
   }
 
   inf->fuse=fuse_new(fc, args, &(inf->fuse_op), sizeof(struct fuse_operations), user_data);
+  if (inf->fuse == NULL) {
+      fuse_unmount(inf->mountpoint, fc);
+      return -1;
+  }
+
   inf->fc = fc;
 
   return 0;

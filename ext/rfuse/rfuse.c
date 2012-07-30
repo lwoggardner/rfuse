@@ -9,9 +9,9 @@
 #include <fuse.h>
 #include <errno.h>
 #include <sys/statfs.h>
-#ifdef HAVE_SETXATTR
+//#ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-#endif
+//#endif
 
 #include <ruby/encoding.h>
 #include "helper.h"
@@ -24,8 +24,8 @@
 #include "bufferwrapper.h"
 
 
-static VALUE empty_string;
-static VALUE null_string;
+static VALUE mRFuse;
+static VALUE eRFuse_Error;
 
 static int unsafe_return_error(VALUE *args)
 {
@@ -273,7 +273,7 @@ static int rf_mknod(const char *path, mode_t mode,dev_t dev)
    @param [Context] context
    @param [String] path
 
-   @return [Stat] or something that quacks like a stat
+   @return [Stat] or something that quacks like a stat, or nil if the path does not exist
    @raise [Errno]
 
    Similar to stat(). The 'st_dev' and 'st_blksize' fields are ignored. The 'st_ino' field is ignored except if the 'use_ino' mount option is given.
@@ -294,7 +294,10 @@ static int rf_getattr(const char *path, struct stat *stbuf)
   
   res=rb_protect((VALUE (*)())unsafe_getattr,(VALUE) args,&error);
 
-  if (error || (res == Qnil))
+  if (res == Qnil) {
+      return -ENOENT;
+  }
+  if (error)
   {
     return -(return_error(ENOENT));
   }
@@ -856,7 +859,6 @@ long rb_strcpy(VALUE str, char *buf, size_t size)
     long length;
 
     length = RSTRING_LEN(str);
-
     if (length <= (long) size)
     { 
         memcpy(buf,RSTRING_PTR(str),length);
@@ -1072,7 +1074,7 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   }
   else
   {
-    return rb_strcopy(res,buf,size);
+    return rb_strcpy(res,buf,size);
   }
 }
 
@@ -1094,9 +1096,7 @@ static VALUE unsafe_listxattr(VALUE *args)
 
   //We'll let Ruby do the hard work of creating a String
   //separated by NULLs
-  Check_Type(res,T_ARRAY);
-  rb_ary_push(res,empty_string);
-  return rb_ary_join(res,null_string);
+  return rb_funcall(mRFuse,rb_intern("packxattr"),1,res);
 }
 
 static int rf_listxattr(const char *path,char *buf, size_t size)
@@ -1751,16 +1751,36 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
   return 0;
 }
 
+/* 
+   Is the filesystem successfully mounted
+
+   @return [Boolean] true if mounted, false otherwise
+
+*/
+static VALUE rf_mounted(VALUE self)
+{
+  struct intern_fuse *inf;
+  Data_Get_Struct(self,struct intern_fuse,inf);
+  
+  return (inf->fuse == NULL) ? Qfalse : Qtrue; 
+}
 /*
    Main single-threaded loop. Once started no other Ruby threads will run, including
    signal handlers etc..  Will only exit when the filesystem is unmounted externally
    (eg with fusermount -u)
+
+   @return [void]
+   @raise [RFuse::Error] if the filesystem was not initialised and mounted successfully
 */
 static VALUE rf_loop(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  fuse_loop(inf->fuse);
+  if (inf->fuse == NULL) {
+    rb_raise(eRFuse_Error,"FUSE not mounted");
+  } else {
+    fuse_loop(inf->fuse);
+  }
   return Qnil;
 }
 
@@ -1768,9 +1788,11 @@ static VALUE rf_loop(VALUE self)
    Calls the multi-threaded fuse loop
    Here for completeness - it will not work!!
 
-   TODO: probably need to manually deal with the global interpreter lock
-   ie, give it up before calling fuse_loop_mt, and acquiring it around each
-   fuse operation
+   TODO: Perhaps call fuse_loop_mt inside rb_thread_blocking_region
+   and reacquire the GVL around each fuse operation callback.
+   Not sure what the point would be in comparison to using IO.select around {#process}
+   apart from allowing the same ruby process to make filesystem calls on its own
+   FUSE system. Unblocking function would need to call fuse_exit
 */
 static VALUE rf_loop_mt(VALUE self)
 {
@@ -1781,7 +1803,7 @@ static VALUE rf_loop_mt(VALUE self)
 }
 
 /* 
-   Exit fuse - only useful if you are using #process rather than #loop
+   Exit fuse - only useful if you are using {#process} rather than #loop
 */
 VALUE rf_exit(VALUE self)
 {
@@ -1792,13 +1814,15 @@ VALUE rf_exit(VALUE self)
 }
 
 /*
-   Unmount fuse - only useful if you are using #process rather than #loop
+   Unmount fuse - only useful if you are using {#process} rather than #loop
 */
 VALUE rf_unmount(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  fuse_unmount(inf->mountpoint, inf->fc);
+  if (inf->fc != NULL) {
+      fuse_unmount(inf->mountpoint, inf->fc);
+  }
   return Qnil;
 }
 
@@ -1826,7 +1850,9 @@ VALUE rf_invalidate(VALUE self,VALUE path)
 }
 
 /*
-   @return [Integer] /dev/fuse file descriptor for use with IO.select and #process
+   @return [Integer] /dev/fuse file descriptor for use with IO.select and {#process}
+   
+TODO: raise RFuse::Error if not mounted
 */
 VALUE rf_fd(VALUE self)
 {
@@ -1837,7 +1863,8 @@ VALUE rf_fd(VALUE self)
 
 /*
  Process one fuse command from the kernel
- @return [Integer] < 0 if we're not mounted..
+ @return [Integer] < 0 if not mounted
+ TODO: Probably should raise error if not mounted
 */
 VALUE rf_process(VALUE self)
 {
@@ -1966,12 +1993,16 @@ static VALUE rf_initialize(
 
   struct fuse_args *args = rarray2fuseargs(opts);
 
-
   //Store our fuse object in user_data, this will be returned to use in the
   //session context
   void* user_data = self;
 
-  intern_fuse_init(inf, args, user_data);
+  int init_result;
+
+  // init_result indicates not mounted, but so does inf->fuse == NULL
+  // raise exceptions only if we try to use the mount
+  // can test with mounted?
+  init_result = intern_fuse_init(inf, args, user_data);
 
   return self;
 }
@@ -1998,13 +2029,15 @@ void rfuse_init(VALUE module)
 {
 #if 0
     //Trick Yardoc
-    module = rb_define_module("RFuse");
+    mRFuse = rb_define_mRFuse("RFuse");
 #endif
-  VALUE cFuse=rb_define_class_under(module,"Fuse",rb_cObject);
+  mRFuse = module;
+  VALUE cFuse=rb_define_class_under(mRFuse,"Fuse",rb_cObject);
 
   rb_define_alloc_func(cFuse,rf_new);
 
   rb_define_method(cFuse,"initialize",rf_initialize,2);
+  rb_define_method(cFuse,"mounted?",rf_mounted,0);
   rb_define_method(cFuse,"loop",rf_loop,0);
   rb_define_method(cFuse,"loop_mt",rf_loop_mt,0); //TODO: multithreading
   rb_define_method(cFuse,"exit",rf_exit,0);
@@ -2016,8 +2049,7 @@ void rfuse_init(VALUE module)
   rb_define_method(cFuse,"process",rf_process,0);
   rb_attr(cFuse,rb_intern("open_files"),1,0,Qfalse);
 
-  null_string = rb_str_new("\0",1);
-  empty_string = rb_str_new2("");
+  eRFuse_Error = rb_define_class_under(mRFuse,"Error",rb_eStandardError);
 
 #if 0
   //Trick Yarddoc into documenting abstract fuseoperations

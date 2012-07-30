@@ -5,6 +5,11 @@ require 'rfuse/rfuse'
 # Ruby FUSE (Filesystem in USErspace) binding
 module RFuse
 
+  # Used by listxattr
+  def self.packxattr(xattrs) 
+      xattrs.join("\000")
+  end
+
   #This class is useful to make your filesystem implementation
   #debuggable and testable without needing to mount an actual filesystem
   #or inherit from {Fuse}
