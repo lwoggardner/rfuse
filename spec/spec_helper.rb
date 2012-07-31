@@ -26,6 +26,7 @@ module RFuseHelper
             begin
                 fork_block.call() if fork_block
             ensure
+                sleep 0.3
                 system("fusermount -u #{mnt}")
             end
         }
