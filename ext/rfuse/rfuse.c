@@ -4,6 +4,7 @@
 #endif
 //FOR LINUX ONLY
 #include <linux/stat.h> 
+#include <linux/kdev_t.h>
 
 #include <ruby.h>
 #include <fuse.h>
@@ -209,19 +210,12 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 
   res = rb_protect((VALUE (*)())unsafe_getdir, (VALUE)args, &error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
 /*
    Create a file node
-   @overload mknod(context,path,mode,dev)
+   @overload mknod(context,path,mode,major,minor)
    @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#1465eb2268cec2bb5ed11cb09bbda42f mknod}
 
    @param [Context] context
@@ -229,6 +223,8 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
    @param [Integer] mode  type & permissions
    @param [Integer] major
    @param [Integer] minor
+
+   @return[void]
 
    This is called for creation of all non-directory, non-symlink nodes. If the filesystem defines {#create}, then for regular files that will be called instead.
 
@@ -256,14 +252,7 @@ static int rf_mknod(const char *path, mode_t mode,dev_t dev)
   args[4]=INT2FIX(major);
   args[5]=INT2FIX(minor);
   res=rb_protect((VALUE (*)())unsafe_mknod,(VALUE) args,&error);
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
 /*
@@ -1886,16 +1875,17 @@ VALUE rf_process(VALUE self)
 */
 static VALUE rf_initialize(
   VALUE self,
-  VALUE mountpoint,
+  VALUE mountpoint_obj,
   VALUE opts)
 {
-  Check_Type(mountpoint,T_STRING);
+
+  //Allow things like Pathname to be sent as a mountpoint
+  VALUE mountpoint = rb_obj_as_string(mountpoint_obj);
   Check_Type(opts, T_ARRAY);
 
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
 
-  //TODO: encode to rb_filesystem_encoding()
   inf->mountpoint = strdup(StringValueCStr(mountpoint));
 
   if (RESPOND_TO(self,"getattr"))

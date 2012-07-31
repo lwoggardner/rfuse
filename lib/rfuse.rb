@@ -67,33 +67,45 @@ module RFuse
   end #class FuseDelegator
 
   # Helper class to return from :getattr method
-  # All attributes are Integers and default to 0
   class Stat
-    S_IFMT   = 0170000 # Format mask
-    S_IFDIR  = 0040000 # Directory.  
-    S_IFCHR  = 0020000 # Character device.
-    S_IFBLK  = 0060000 # Block device.
-    S_IFREG  = 0100000 # Regular file. 
-    S_IFIFO  = 0010000 # FIFO. 
-    S_IFLNK  = 0120000 # Symbolic link. 
-    S_IFSOCK = 0140000 # Socket. 
+    # Format mask
+    S_IFMT   = 0170000 
+    # Directory  
+    S_IFDIR  = 0040000
+    # Character device
+    S_IFCHR  = 0020000
+    # Block device
+    S_IFBLK  = 0060000
+    # Regular file 
+    S_IFREG  = 0100000
+    # FIFO. 
+    S_IFIFO  = 0010000
+    # Symbolic link 
+    S_IFLNK  = 0120000
+    # Socket 
+    S_IFSOCK = 0140000
   
-    # Create a Stat representing a directory
     # @param [Fixnum] mode file permissions
     # @param [Hash<Symbol,Fixnum>] values initial values for other attributes
+    #
+    # @return [Stat] representing a directory
     def self.directory(mode=0,values = { })
       return self.new(S_IFDIR,mode,values)
     end
     
-    # Create a Stat representing a regular file
     # @param [Fixnum] mode file permissions
     # @param [Hash<Symbol,Fixnum>] values initial values for other attributes
+    #
+    # @return [Stat] representing a regular file
     def self.file(mode=0,values = { })
       return self.new(S_IFREG,mode,values)
     end
 
-    attr_accessor :uid,:gid,:mode,:size,:atime,:mtime,:ctime
-    attr_accessor :dev,:ino,:nlink,:rdev,:blksize,:blocks
+    # @return [Integer] see stat(2)
+    attr_accessor :uid,:gid,:mode,:size, :dev,:ino,:nlink,:rdev,:blksize,:blocks
+
+    # @return [Integer, Time] see stat(2)
+    attr_accessor :atime,:mtime,:ctime
     
     def initialize(type,permissions,values = { })
       values[:mode] = ((type & S_IFMT) | (permissions & 07777))

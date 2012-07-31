@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'pathname'
 
 describe RFuse::Fuse do
    
@@ -29,7 +30,12 @@ describe RFuse::Fuse do
             fuse.mounted?.should be_false
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
-
+       
+        it "should handle a Pathname as a mountpoint" do
+            fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new("/tmp/rfuse-spec"))
+            fuse.mounted?.should be_true
+            fuse.unmount()
+        end
     end
 
     context "links" do
@@ -80,6 +86,38 @@ describe RFuse::Fuse do
     end
 
     context "timestamps" do
+
+        it "should support stat with subsecond resolution" do
+           begin
+               atime = Time.now() + 60
+               sleep(0.001)
+           end until atime.usec != 0
+
+           begin
+               mtime = Time.now() + 600
+               sleep(0.001)
+           end until mtime.usec != 0
+
+           begin
+                ctime = Time.now() + 3600
+                sleep(0.001)
+           end until ctime.usec != 0
+
+           file_stat.atime = atime
+           file_stat.mtime = mtime
+           file_stat.ctime = ctime
+
+
+           mockfs.stub(:getattr).with(anything(),"/nanos").and_return(file_stat)
+
+           with_fuse("/tmp/rfuse-spec",mockfs) do
+               stat = File.stat("/tmp/rfuse-spec/nanos")
+               stat.atime.should == atime
+               stat.ctime.should == ctime
+               stat.mtime.should == mtime
+           end
+        end
+
         it "should set file access and modification times" do
 
             atime = Time.now()
@@ -99,6 +137,21 @@ describe RFuse::Fuse do
     end
 
     context "file io" do
+
+        it "should create files" do
+
+           mockfs.stub(:getattr).with(anything(),"/newfile").and_return(nil,file_stat)
+           mockfs.should_receive(:mknod).with(anything(),"/newfile",file_mode(0644),0,0)
+         
+           with_fuse("/tmp/rfuse-spec",mockfs) do
+                File.open("/tmp/rfuse-spec/newfile","w",0644) { |f| }
+           end
+        end
+
+        # ruby doesn't seem to have a native method to create these
+        # maybe try ruby-mkfifo
+        it "should create special device files"
+
         it "should read files" do
 
             file_stat.size = 11

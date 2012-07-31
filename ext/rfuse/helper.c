@@ -18,12 +18,31 @@ void rstat2stat(VALUE rstat, struct stat *statbuf)
   statbuf->st_size    = FIX2ULONG(rb_funcall(rstat,rb_intern("size"),0));
   statbuf->st_blksize = NUM2ULONG(rb_funcall(rstat,rb_intern("blksize"),0));
   statbuf->st_blocks  = NUM2ULONG(rb_funcall(rstat,rb_intern("blocks"),0));
-  statbuf->st_atime   =
-    NUM2ULONG(rb_funcall(rb_funcall(rstat,rb_intern("atime"),0),rb_intern("to_i"),0));
-  statbuf->st_mtime   =
-    NUM2ULONG(rb_funcall(rb_funcall(rstat,rb_intern("mtime"),0),rb_intern("to_i"),0));
-  statbuf->st_ctime   =
-    NUM2ULONG(rb_funcall(rb_funcall(rstat,rb_intern("ctime"),0),rb_intern("to_i"),0));
+
+  VALUE r_atime = rb_funcall(rstat,rb_intern("atime"),0);
+  VALUE r_mtime = rb_funcall(rstat,rb_intern("mtime"),0);
+  VALUE r_ctime = rb_funcall(rstat,rb_intern("ctime"),0);
+
+  ID to_i = rb_intern("to_i");
+
+  statbuf->st_atime = NUM2ULONG(rb_funcall(r_atime,to_i,0));
+  statbuf->st_mtime = NUM2ULONG(rb_funcall(r_mtime,to_i,0));
+  statbuf->st_ctime = NUM2ULONG(rb_funcall(r_ctime,to_i,0));
+
+//TODO: Find out the correct way to test for nano second resolution availability
+#ifdef _STATBUF_ST_NSEC
+  ID nsec = rb_intern("nsec");
+
+  if (rb_respond_to(r_atime,nsec))
+    statbuf->st_atim.tv_nsec = NUM2ULONG(rb_funcall(r_atime,nsec,0));
+
+  if (rb_respond_to(r_mtime,nsec))
+    statbuf->st_mtim.tv_nsec = NUM2ULONG(rb_funcall(r_mtime,nsec,0));
+
+  if (rb_respond_to(r_ctime,nsec))
+    statbuf->st_ctim.tv_nsec = NUM2ULONG(rb_funcall(r_ctime,nsec,0));
+#endif
+
 }
 
 void rstatvfs2statvfs(VALUE rstatvfs,struct statvfs *statvfsbuf) {
