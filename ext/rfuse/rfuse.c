@@ -7,6 +7,7 @@
 #include <linux/kdev_t.h>
 
 #include <ruby.h>
+#include "ruby_extra.h"
 #include <fuse.h>
 #include <errno.h>
 #include <sys/statfs.h>
@@ -295,6 +296,25 @@ static int rf_getattr(const char *path, struct stat *stbuf)
     rstat2stat(res,stbuf);
     return 0;
   }
+}
+
+static int rf_fuse_getattr_with_gvl(void *args[])
+{
+  printf( "rf_fuse_getattr_With_gvl\n");
+  int result;
+  result = rf_getattr(args[0],args[1]);
+  return result;
+}
+
+static int rf_fuse_getattr(const char *path, struct stat *stbuf)
+{ 
+  printf( "rf_fuse_getattr\n");
+  void* args[2];
+
+  args[0] = path;
+  args[1] = stbuf;
+
+  return (int) rb_thread_call_with_gvl(rf_fuse_getattr_with_gvl,args);
 }
 
 /*
@@ -1493,6 +1513,7 @@ static int rf_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_in
   }
 }
 
+
 /*
    Perform POSIX file locking operation
 
@@ -1753,6 +1774,17 @@ static VALUE rf_mounted(VALUE self)
   
   return (inf->fuse == NULL) ? Qfalse : Qtrue; 
 }
+
+static void rb_fuse_loop_no_gvl(struct fuse *fuse)
+{
+    printf("Starting loop without gvl\n");
+    fuse_loop(fuse);
+}
+
+static void rb_ubf_fuse_exit(struct fuse *fuse)
+{
+  fuse_exit(fuse);
+}
 /*
    Main single-threaded loop. Once started no other Ruby threads will run, including
    signal handlers etc..  Will only exit when the filesystem is unmounted externally
@@ -1768,7 +1800,8 @@ static VALUE rf_loop(VALUE self)
   if (inf->fuse == NULL) {
     rb_raise(eRFuse_Error,"FUSE not mounted");
   } else {
-    fuse_loop(inf->fuse);
+    printf("Releasing GVL\n");
+    rb_thread_blocking_region(rb_fuse_loop_no_gvl,inf->fuse,rb_ubf_fuse_exit,inf->fuse);
   }
   return Qnil;
 }
@@ -1889,7 +1922,7 @@ static VALUE rf_initialize(
   inf->mountpoint = strdup(StringValueCStr(mountpoint));
 
   if (RESPOND_TO(self,"getattr"))
-    inf->fuse_op.getattr     = rf_getattr;
+    inf->fuse_op.getattr     = rf_fuse_getattr;
   if (RESPOND_TO(self,"readlink"))
     inf->fuse_op.readlink    = rf_readlink;
   if (RESPOND_TO(self,"getdir"))
