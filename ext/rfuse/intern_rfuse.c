@@ -69,7 +69,6 @@ int intern_fuse_process(struct intern_fuse *inf)
     return -1;
   }
 
-
   if (fuse_exited(inf->fuse)) {
     return -1;
   }

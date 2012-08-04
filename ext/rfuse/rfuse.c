@@ -1325,7 +1325,8 @@ static void *rf_init(struct fuse_conn_info *conn)
 
    @return [void]
 
-   Called at filesystem exit
+   Called at filesystem exit - which itself is triggered when this fuse object
+   is garbage collected, so not sure it is actually safe to call this
 */
 static VALUE unsafe_destroy(VALUE* args)
 {
@@ -1750,67 +1751,24 @@ static VALUE rf_mounted(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  
-  return (inf->fuse == NULL) ? Qfalse : Qtrue; 
-}
-/*
-   Main single-threaded loop. Once started no other Ruby threads will run, including
-   signal handlers etc..  Will only exit when the filesystem is unmounted externally
-   (eg with fusermount -u)
-
-   @return [void]
-   @raise [RFuse::Error] if the filesystem was not initialised and mounted successfully
-*/
-static VALUE rf_loop(VALUE self)
-{
-  struct intern_fuse *inf;
-  Data_Get_Struct(self,struct intern_fuse,inf);
-  if (inf->fuse == NULL) {
-    rb_raise(eRFuse_Error,"FUSE not mounted");
-  } else {
-    fuse_loop(inf->fuse);
-  }
-  return Qnil;
+ 
+  // Never mounted, unmounted via fusermount, or via rf_unmount
+  return (inf->fuse == NULL || fuse_exited(inf->fuse) ) ? Qfalse : Qtrue; 
 }
 
 /*
-   Calls the multi-threaded fuse loop
-   Here for completeness - it will not work!!
-
-   TODO: Perhaps call fuse_loop_mt inside rb_thread_blocking_region
-   and reacquire the GVL around each fuse operation callback.
-   Not sure what the point would be in comparison to using IO.select around {#process}
-   apart from allowing the same ruby process to make filesystem calls on its own
-   FUSE system. Unblocking function would need to call fuse_exit
-*/
-static VALUE rf_loop_mt(VALUE self)
-{
-  struct intern_fuse *inf;
-  Data_Get_Struct(self,struct intern_fuse,inf);
-  fuse_loop_mt(inf->fuse);
-  return Qnil;
-}
-
-/* 
-   Exit fuse - only useful if you are using {#process} rather than #loop
-*/
-VALUE rf_exit(VALUE self)
-{
-  struct intern_fuse *inf;
-  Data_Get_Struct(self,struct intern_fuse,inf);
-  fuse_exit(inf->fuse);
-  return Qnil;
-}
-
-/*
-   Unmount fuse - only useful if you are using {#process} rather than #loop
+   Unmount filesystem
 */
 VALUE rf_unmount(VALUE self)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
+
+  fuse_exit(inf->fuse);
+
   if (inf->fc != NULL) {
       fuse_unmount(inf->mountpoint, inf->fc);
+      inf->fc = NULL;
   }
   return Qnil;
 }
@@ -1840,26 +1798,36 @@ VALUE rf_invalidate(VALUE self,VALUE path)
 
 /*
    @return [Integer] /dev/fuse file descriptor for use with IO.select and {#process}
-   
-TODO: raise RFuse::Error if not mounted
+   @raise [RFuse::Error] if fuse not mounted   
 */
 VALUE rf_fd(VALUE self)
 {
  struct intern_fuse *inf;
  Data_Get_Struct(self,struct intern_fuse,inf);
- return INT2NUM(intern_fuse_fd(inf));
+ if (inf->fuse == NULL) {
+   rb_raise(eRFuse_Error,"FUSE not mounted");
+   return Qnil;
+ } else {
+   return INT2NUM(intern_fuse_fd(inf));
+ }
 }
 
 /*
  Process one fuse command from the kernel
- @return [Integer] < 0 if not mounted
- TODO: Probably should raise error if not mounted
+
+ @return [Integer] 0 if successful
+ @raise [RFuse::Error] if fuse not mounted   
 */
 VALUE rf_process(VALUE self)
 {
  struct intern_fuse *inf;
  Data_Get_Struct(self,struct intern_fuse,inf);
- return INT2NUM(intern_fuse_process(inf));
+ if (inf->fuse == NULL) {
+   rb_raise(eRFuse_Error,"FUSE not mounted");
+   return Qnil;
+ } else {
+    return INT2NUM(intern_fuse_process(inf));
+ }
 }
 
 #define RESPOND_TO(obj,methodname) \
@@ -1956,8 +1924,8 @@ static VALUE rf_initialize(
     inf->fuse_op.fsyncdir    = rf_fsyncdir;
   if (RESPOND_TO(self,"init"))
     inf->fuse_op.init        = rf_init;
-  if (RESPOND_TO(self,"destroy"))
-    inf->fuse_op.destroy     = rf_destroy;
+//  if (RESPOND_TO(self,"destroy"))
+//    inf->fuse_op.destroy     = rf_destroy;
   if (RESPOND_TO(self,"access"))
     inf->fuse_op.access      = rf_access;
   if (RESPOND_TO(self,"ftruncate"))
@@ -1977,10 +1945,6 @@ static VALUE rf_initialize(
     inf->fuse_op.poll        = rf_poll;
 */
 
-  //Create the open files hash where we cache FileInfo objects
-  VALUE open_files_hash=rb_hash_new();
-  rb_iv_set(self,"@open_files",open_files_hash);
-
   struct fuse_args *args = rarray2fuseargs(opts);
 
   //Store our fuse object in user_data, this will be returned to use in the
@@ -1994,6 +1958,13 @@ static VALUE rf_initialize(
   // can test with mounted?
   init_result = intern_fuse_init(inf, args, user_data);
 
+  //Create the open files hash where we cache FileInfo objects
+  VALUE open_files_hash;
+  if (init_result == 0) {
+    open_files_hash=rb_hash_new();
+    rb_iv_set(self,"@open_files",open_files_hash);
+    rb_funcall(self,rb_intern("ruby_initialize"),0);
+  }
   return self;
 }
 
@@ -2008,6 +1979,7 @@ static VALUE rf_new(VALUE class)
 
 /*
 * Document-class: RFuse::Fuse
+* 
 * A FUSE filesystem - extend this class implementing
 * the various abstract methods to provide your filesystem.
 *
@@ -2028,9 +2000,6 @@ void rfuse_init(VALUE module)
 
   rb_define_method(cFuse,"initialize",rf_initialize,2);
   rb_define_method(cFuse,"mounted?",rf_mounted,0);
-  rb_define_method(cFuse,"loop",rf_loop,0);
-  rb_define_method(cFuse,"loop_mt",rf_loop_mt,0); //TODO: multithreading
-  rb_define_method(cFuse,"exit",rf_exit,0);
   rb_define_method(cFuse,"invalidate",rf_invalidate,1);
   rb_define_method(cFuse,"unmount",rf_unmount,0);
   rb_define_method(cFuse,"mountname",rf_mountname,0);
@@ -2072,6 +2041,7 @@ void rfuse_init(VALUE module)
   rb_define_method(cFuse,"releasedir",unsafe_releasedir,0);
   rb_define_method(cFuse,"fsyncdir",unsafe_fsyncdir,0);
   rb_define_method(cFuse,"init",unsafe_init,0);
+  rb_define_method(cFuse,"destroy",unsafe_destroy,0);
   rb_define_method(cFuse,"access",unsafe_access,0);
   rb_define_method(cFuse,"create",unsafe_create,0);
   rb_define_method(cFuse,"ftruncate",unsafe_ftruncate,0);

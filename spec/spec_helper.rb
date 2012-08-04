@@ -33,10 +33,10 @@ module RFuseHelper
 
         fuse = RFuse::FuseDelegator.new(mockfs,mnt,*options)
         fuse.loop
-
         pid,result = Process.waitpid2(fpid) 
         result.should be_success
         fuse.open_files.should be_empty()
+        fuse.mounted?.should be_false
     end
 
     def file_mode(mode)

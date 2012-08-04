@@ -29,7 +29,7 @@ describe RFuse::Fuse do
                 "hello world"
             }
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
+            with_fuse("/tmp/rfuse-spec",mockfs,"-odebug") do
                 f1 = File.new("/tmp/rfuse-spec/one")
                 f2 = File.new("/tmp/rfuse-spec/two")
 

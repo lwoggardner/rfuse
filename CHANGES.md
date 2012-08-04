@@ -12,3 +12,9 @@ API breaking changes
  * {RFuse::Fuse#getxattr}: removed unnecessary size parameter
  * {RFuse::Fuse#listxattr}: return a String array which will be packed into a list of
                          NULL terminated strings
+
+Removed methods
+ 
+ * RFuse::loop_mt - never worked, (see multithread branch on github)
+ * RFuse::destory - callback was being called during finalizer which was not safe
+
