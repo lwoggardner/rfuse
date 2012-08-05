@@ -1,12 +1,14 @@
 require 'spec_helper'
 
 describe RFuse do
+
+    let(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil) ; m }
+    let(:mountpoint) { tempmount() }
+
     context "ruby loop" do
         it "should exit from another thread and allow multiple loops" do
-            mockfs = mock("fuse")
-            mockfs.stub(:getattr).and_return(nil)
-            
-            fuse = RFuse::FuseDelegator.new(mockfs,"/tmp/rfuse-spec")
+           
+            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint)
             t = Thread.new { sleep 0.5;  fuse.exit }
             fuse.loop()
             t.join
@@ -18,6 +20,7 @@ describe RFuse do
         end
 
 
+        # This will never work!
         #it "should allow threads to operate on the filesystem" do
         #
         #    mockfs = mock("fuse")
@@ -31,25 +34,32 @@ describe RFuse do
         #    fuse.unmount()
         #end
 
-        it "should handle missing files" do
-            mockfs = mock("fuse")
-            mockfs.stub(:getattr).and_return(nil)
+        it "should allow other threads to be scheduled" do
+            
             file_stat = RFuse::Stat.file(0444)
 
-            mockfs.stub(:getattr).with(anything(),"/missing") {
-                GC.start()
+            thread_ran = false
+
+            mockfs.stub(:getattr).with(anything(),"/before") {
+                puts "before"
+                thread_ran.should be_false
                 file_stat
             }
 
-            thread_ran = false
-            Thread.new() { sleep 0.5 ; thread_ran = true }
-            with_fuse("/tmp/rfuse-spec",mockfs,) do
+            mockfs.stub(:getattr).with(anything(),"/missing") {
+                puts "missing"
+                GC.start()
+                thread_ran.should be_true
+                file_stat
+            }
+
+            t = Thread.new() { sleep 1.5 ; thread_ran = true }
+            with_fuse(mountpoint,mockfs) do
+                File.stat("#{mountpoint}/before");
                 sleep 2;
-                File.stat("/tmp/rfuse-spec/missing");
+                File.stat("#{mountpoint}/missing");
             end
-            thread_ran.should be_true
         end
     end
-
 end
 

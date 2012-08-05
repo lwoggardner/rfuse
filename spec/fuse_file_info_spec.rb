@@ -12,7 +12,7 @@ describe RFuse::Fuse do
                 when "/one","/two"
                     file_stat
                 else
-                    raise Errno::ENOENT 
+                    nil
                 end
 
             }
@@ -29,9 +29,10 @@ describe RFuse::Fuse do
                 "hello world"
             }
 
-            with_fuse("/tmp/rfuse-spec",mockfs,"-odebug") do
-                f1 = File.new("/tmp/rfuse-spec/one")
-                f2 = File.new("/tmp/rfuse-spec/two")
+            mountpoint = tempmount()
+            with_fuse(mountpoint,mockfs) do
+                f1 = File.new("#{mountpoint}/one")
+                f2 = File.new("#{mountpoint}/two")
 
                 val = f1.gets
                 val.should == "hello world" 

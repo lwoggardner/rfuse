@@ -16,5 +16,5 @@ API breaking changes
 Removed methods
  
  * RFuse::loop_mt - never worked, (see multithread branch on github)
- * RFuse::destory - callback was being called during finalizer which was not safe
+ * RFuse::destroy - callback was being called during finalizer which was not safe
 

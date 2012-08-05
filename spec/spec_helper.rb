@@ -1,4 +1,5 @@
 require 'rfuse'
+require 'tmpdir'
 
 class FileModeMatcher
     def initialize(expected)
@@ -22,7 +23,7 @@ module RFuseHelper
     def with_fuse(mnt,mockfs,*options,&fork_block)
 
         fpid = Kernel.fork() {
-            sleep 1
+            sleep 0.5
             begin
                 fork_block.call() if fork_block
             ensure
@@ -42,7 +43,9 @@ module RFuseHelper
     def file_mode(mode)
         FileModeMatcher.new(mode)
     end
+
+    def tempmount()
+        Dir.mktmpdir("rfuse-spec")
+    end
 end
-#TODO: mkdir /tmp/rfuse-spec, or provide an optional parameter to with_fuse for
-# a tempdir
 include RFuseHelper

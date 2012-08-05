@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'ffi-xattr'
+
 describe RFuse::Fuse do
         it "should handle extended attributes" do
             mockfs = mock("fuse")
@@ -20,8 +21,10 @@ describe RFuse::Fuse do
             mockfs.should_receive(:setxattr).with(anything(),"/myfile","user.three","updated",anything())
             mockfs.should_receive(:removexattr).with(anything(),"/myfile","user.one")
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                xattr = Xattr.new("/tmp/rfuse-spec/myfile")
+            mountpoint = tempmount()
+
+            with_fuse(mountpoint,mockfs) do
+                xattr = Xattr.new("#{mountpoint}/myfile")
                 xattr.list.should include("user.one")
                 xattr.list.should include("user.two")
                 xattr.list.size.should == 2

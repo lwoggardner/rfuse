@@ -3,18 +3,14 @@ require 'pathname'
 
 describe RFuse::Fuse do
    
-    attr_reader :mockfs,:file_stat,:dir_stat
+    let(:dir_stat) { RFuse::Stat.directory(0444) }
+    let(:file_stat) { RFuse::Stat.file(0444) }
+    let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
+    let(:mountpoint) { tempmount() }
 
-    before(:each) do
-        @mockfs = mock("fuse")
-        @mockfs.stub(:getattr).and_return(nil)
-        @dir_stat = RFuse::Stat.directory(0444)
-        @file_stat = RFuse::Stat.file(0444)
-    end
-    
     context "mount options" do
         it "should handle -h" do
-            fuse = RFuse::FuseDelegator.new(mockfs,"/tmp/rfuse-spec","-h")
+            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-h")
             fuse.mounted?.should be_false
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
@@ -26,13 +22,13 @@ describe RFuse::Fuse do
         end
 
         it "should behave sensibly for bad options" do
-            fuse = RFuse::FuseDelegator.new(mockfs,"/tmp/rfuse-spec","-eviloption") 
+            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-eviloption") 
             fuse.mounted?.should be_false
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
        
         it "should handle a Pathname as a mountpoint" do
-            fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new("/tmp/rfuse-spec"))
+            fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new(mountpoint))
             fuse.mounted?.should be_true
             fuse.unmount()
         end
@@ -52,8 +48,8 @@ describe RFuse::Fuse do
             mockfs.stub(:getattr).with(anything(),"/aDirectory").and_return(nil,dir_stat)
             mockfs.should_receive(:mkdir).with(anything(),"/aDirectory",anything())
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                Dir.mkdir("/tmp/rfuse-spec/aDirectory")
+            with_fuse(mountpoint,mockfs) do
+                Dir.mkdir("#{mountpoint}/aDirectory")
             end
         end
 
@@ -64,8 +60,8 @@ describe RFuse::Fuse do
                 filler.push("world",nil,0)
             end
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                entries = Dir.entries("/tmp/rfuse-spec")
+            with_fuse(mountpoint,mockfs) do
+                entries = Dir.entries(mountpoint)
                 entries.size.should == 2
                 entries.should include("hello")
                 entries.should include("world")
@@ -79,8 +75,8 @@ describe RFuse::Fuse do
 
             mockfs.should_receive(:chmod).with(anything(),"/myPerms",file_mode(0644))
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                File.chmod(0644,"/tmp/rfuse-spec/myPerms").should == 1
+            with_fuse(mountpoint,mockfs) do
+                File.chmod(0644,"#{mountpoint}/myPerms").should == 1
             end
         end
     end
@@ -108,10 +104,11 @@ describe RFuse::Fuse do
            file_stat.ctime = ctime
 
 
+           # ruby can't set file times with ns res, o we are limited to usecs
            mockfs.stub(:getattr).with(anything(),"/nanos").and_return(file_stat)
 
-           with_fuse("/tmp/rfuse-spec",mockfs) do
-               stat = File.stat("/tmp/rfuse-spec/nanos")
+           with_fuse(mountpoint,mockfs) do
+               stat = File.stat("#{mountpoint}/nanos")
                stat.atime.should == atime
                stat.ctime.should == ctime
                stat.mtime.should == mtime
@@ -126,13 +123,10 @@ describe RFuse::Fuse do
             mockfs.stub(:getattr).with(anything(),"/times").and_return(file_stat)
             mockfs.should_receive(:utime).with(anything(),"/times",atime.to_i,mtime.to_i)
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                File.utime(atime,mtime,"/tmp/rfuse-spec/times").should == 1
+            with_fuse(mountpoint,mockfs) do
+                File.utime(atime,mtime,"#{mountpoint}/times").should == 1
             end
         end
-
-        # ruby can't set file times with ns res
-        it "should set file access and modification times with nanosecond resolution"
 
     end
 
@@ -143,8 +137,8 @@ describe RFuse::Fuse do
            mockfs.stub(:getattr).with(anything(),"/newfile").and_return(nil,file_stat)
            mockfs.should_receive(:mknod).with(anything(),"/newfile",file_mode(0644),0,0)
          
-           with_fuse("/tmp/rfuse-spec",mockfs) do
-                File.open("/tmp/rfuse-spec/newfile","w",0644) { |f| }
+           with_fuse(mountpoint,mockfs) do
+                File.open("#{mountpoint}/newfile","w",0644) { |f| }
            end
         end
 
@@ -171,8 +165,8 @@ describe RFuse::Fuse do
                 "hello world"[offset,reads]
             }
 
-            with_fuse("/tmp/rfuse-spec",mockfs) do
-                File.open("/tmp/rfuse-spec/test") do |f|
+            with_fuse(mountpoint,mockfs) do
+                File.open("#{mountpoint}/test") do |f|
                     val = f.gets
                     val.should == "hello world"
                 end
