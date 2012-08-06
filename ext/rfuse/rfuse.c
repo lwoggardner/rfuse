@@ -122,15 +122,7 @@ static int rf_readdir(const char *path, void *buf,
   args[5]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
-
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
 /*
@@ -1793,7 +1785,7 @@ VALUE rf_invalidate(VALUE self,VALUE path)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  return fuse_invalidate(inf->fuse,STR2CSTR(path)); //TODO: check if str?
+  return fuse_invalidate(inf->fuse,STR2CSTR(path)); 
 }
 
 /*
