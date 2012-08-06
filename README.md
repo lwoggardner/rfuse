@@ -1,13 +1,15 @@
 RFuse
 ===============
 
+http://rubygems.org/gems/rfuse
+
 FUSE bindings for Ruby 1.9  
 
 FUSE (Filesystem in USErspace) is a simple interface for userspace programs to export a virtual filesystem to the linux kernel. FUSE aims to provide a secure method for non privileged users to create and mount their own filesystem implementations.
 
 This library provides the low-level fuse operations as callbacks into a ruby object.
 
-For a more ruby-ish API for creating filesystems see {http://rubygems.org/gems/rfusefs RFuseFS} which is built on RFuse and takes on some of the heavy lifting.
+For a more ruby-ish API for creating filesystems see {http://rubygems.org/gems/rfusefs RFuseFS} which is built on RFuse and takes care of some of the heavy lifting.
 
 Dependencies
 --------------
@@ -30,11 +32,12 @@ For a sample filesystem see sample/test-ruby.rb
 To run the example:
 
      $ mkdir /tmp/fuse
-     $ sample/test-ruby.rb
+     $ ruby sample/test-ruby.rb /tmp/fuse
 
-..and there should be a filesystem mounted at /tmp/fuse.
+..and there should be an empty in-memory filesystem mounted at /tmp/fuse
 
      $ fusermount -u /tmp/fuse
+
 ...should stop the example filesystem program.
 
 HISTORY

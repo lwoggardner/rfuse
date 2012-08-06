@@ -6,8 +6,16 @@ require 'rfuse/rfuse'
 module RFuse
 
     # Used by listxattr
-    def self.packxattr(xattrs) 
-        xattrs.join("\000")
+    def self.packxattr(xattrs)
+        case xattrs
+        when Array
+            xattrs.join("\000")
+        when String
+            #assume already \0 separated list of keys
+            xattrs
+        else
+            raise RFuse::Error, ":listxattr must return Array or String, got #{xattrs.inspect}"
+        end
     end
 
     class Fuse
@@ -28,6 +36,7 @@ module RFuse
             raise RFuse::Error, "FUSE not mounted" unless mounted?
             @running = true
             while @running do
+                begin
                     ready, ignore, errors  = IO.select([@fuse_io,@pr],[],[@fuse_io])
 
                     if ready.include?(@pr)
@@ -48,6 +57,9 @@ module RFuse
                             @running = false
                         end
                     end
+                rescue Interrupt
+                    #oh well...
+                end
             end
         end
 
@@ -179,14 +191,19 @@ module RFuse
     # Helper class to return from :statfs (eg for df output)
     # All attributes are Integers and default to 0
     class StatVfs
+
+        # @return [Integer]
         attr_accessor :f_bsize,:f_frsize,:f_blocks,:f_bfree,:f_bavail
+
+        # @return [Integer]
         attr_accessor :f_files,:f_ffree,:f_favail,:f_fsid,:f_flag,:f_namemax
 
         # values can be symbols or strings but drop the pointless f_ prefix
         def initialize(values={ })
             @f_bsize, @f_frsize, @f_blocks, @f_bfree, @f_bavail, @f_files, @f_ffree, @f_favail,@f_fsid, @f_flag,@f_namemax = Array.new(13,0)
             values.each_pair do |k,v|
-                instance_variable_set("@f_#{ k }",v)
+                prefix = k.startswith?("f_") ? "" : "f_"
+                instance_variable_set("@#{prefix}#{k}",v)
             end
         end
     end
