@@ -1756,7 +1756,9 @@ VALUE rf_unmount(VALUE self)
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
 
-  fuse_exit(inf->fuse);
+  if (inf->fuse != NULL)  {
+      fuse_exit(inf->fuse);
+  }
 
   if (inf->fc != NULL) {
       fuse_unmount(inf->mountpoint, inf->fc);
