@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.email       = ["grant@lastweekend.com.au"]
   s.homepage    = "http://rubygems.org/gems/rfuse"
   s.summary     = %q{Ruby language binding for FUSE}
-  s.description = %q{Ruby language binding for FUSE. It was forked from the original rfuse/rfuse-ng and modified for Ruby 1.9.2.}
+  s.description = %q{Write userspace filesystems in Ruby}
 
   s.files         = `git ls-files`.split("\n")
   s.extensions    = 'ext/rfuse/extconf.rb'
