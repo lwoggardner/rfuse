@@ -14,7 +14,6 @@
 #include <sys/xattr.h>
 //#endif
 
-#include <ruby/encoding.h>
 #include "helper.h"
 #include "intern_rfuse.h"
 #include "filler.h"
@@ -24,13 +23,32 @@
 #include "pollhandle.h"
 #include "bufferwrapper.h"
 
+#ifdef HAVE_RUBY_ENCODING_H
+#include <ruby/encoding.h>
+#endif
+
+#ifndef HAVE_RB_ERRINFO
+static VALUE rb_errinfo()
+{
+    return ruby_errinfo;
+}
+#endif
 
 static VALUE mRFuse;
 static VALUE eRFuse_Error;
 
+static VALUE rb_filesystem_encode(VALUE str)
+{
+#ifdef HAVE_RUBY_ENCODING_H
+  return rb_enc_associate(str,rb_filesystem_encoding());
+#else
+  return str;
+#endif
+}
+
 static int unsafe_return_error(VALUE *args)
 {
- 
+
   if (rb_respond_to(rb_errinfo(),rb_intern("errno"))) {
     //We expect these and they get passed on the fuse so be quiet...
     return rb_funcall(rb_errinfo(),rb_intern("errno"),0);
@@ -73,7 +91,7 @@ static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const ch
   args[0] = ctx->private_data;
   args[1] = wrap_context(ctx);
   args[2] = rb_str_new2(path);
-  rb_enc_associate(args[2],rb_filesystem_encoding());
+  rb_filesystem_encode(args[2]);
 }
 /*
  @overload readdir(context,path,filler,offset,ffi)
@@ -275,12 +293,13 @@ static int rf_getattr(const char *path, struct stat *stbuf)
   
   res=rb_protect((VALUE (*)())unsafe_getattr,(VALUE) args,&error);
 
-  if (res == Qnil) {
-      return -ENOENT;
-  }
   if (error)
   {
     return -(return_error(ENOENT));
+  }
+  
+  if (res == Qnil) {
+      return -ENOENT;
   }
   else
   {
@@ -733,7 +752,7 @@ static int rf_symlink(const char *path,const char *as)
   init_context_path_args(args,ctx,path);
   
   args[3]=rb_str_new2(as);
-  rb_enc_associate(args[3],rb_filesystem_encoding());
+  rb_filesystem_encode(args[3]);
   
   res=rb_protect((VALUE (*)())unsafe_symlink,(VALUE) args,&error);
 
@@ -768,7 +787,7 @@ static int rf_rename(const char *path,const char *as)
   init_context_path_args(args,ctx,path);
 
   args[3]=rb_str_new2(as);
-  rb_enc_associate(args[3],rb_filesystem_encoding());
+  rb_filesystem_encode(args[3]);
   
   res=rb_protect((VALUE (*)())unsafe_rename,(VALUE) args,&error);
 
@@ -802,7 +821,7 @@ static int rf_link(const char *path,const char * as)
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=rb_str_new2(as);
-  rb_enc_associate(args[3],rb_filesystem_encoding());
+  rb_filesystem_encode(args[3]);
   res=rb_protect((VALUE (*)())unsafe_link,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
@@ -1585,17 +1604,17 @@ static int rf_utimens(const char * path, const struct timespec tv[2])
   struct fuse_context *ctx = fuse_get_context();
   init_context_path_args(args,ctx,path);
 
-  // tv_sec * 1000000 + tv_nsec
+  // tv_sec * 1000000000 + tv_nsec
   args[3] = rb_funcall(
     rb_funcall(
-      INT2NUM(tv[0].tv_sec), rb_intern("*"), 1, INT2NUM(1000000)
+      INT2NUM(tv[0].tv_sec), rb_intern("*"), 1, INT2NUM(1000000000)
     ),
     rb_intern("+"), 1, INT2NUM(tv[0].tv_nsec)
   );
 
   args[4] = rb_funcall(
     rb_funcall(
-      INT2NUM(tv[1].tv_sec), rb_intern("*"), 1, INT2NUM(1000000)
+      INT2NUM(tv[1].tv_sec), rb_intern("*"), 1, INT2NUM(1000000000)
     ),
     rb_intern("+"), 1, INT2NUM(tv[1].tv_nsec)
   );
@@ -1675,7 +1694,7 @@ static int rf_ioctl(const char *path, int cmd, void *arg,
   int   error = 0;
 
   args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  rb_filesystem_encode(args[0]);
   args[1] = INT2NUM(cmd);
   args[2] = wrap_buffer(arg);
   args[3] = get_file_info(ffi);
@@ -1715,7 +1734,7 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
   int   error = 0;
 
   args[0] = rb_str_new2(path);
-  rb_enc_associate(args[0],rb_filesystem_encoding());
+  rb_filesystem_encode(args[0]);
   args[1] = get_file_info(ffi);
   args[2] = wrap_pollhandle(ph);
   args[3] = INT2NUM(*reventsp);
@@ -1756,6 +1775,8 @@ VALUE rf_unmount(VALUE self)
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
 
+  rb_funcall(self,rb_intern("ruby_unmount"),0);
+
   if (inf->fuse != NULL)  {
       fuse_exit(inf->fuse);
   }
@@ -1775,7 +1796,7 @@ VALUE rf_mountname(VALUE self)
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
   VALUE result = rb_str_new2(inf->mountpoint);
-  rb_enc_associate(result,rb_filesystem_encoding());
+  rb_filesystem_encode(result);
 
   return result;
 }

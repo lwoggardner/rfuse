@@ -1,8 +1,9 @@
 require 'spec_helper'
 require 'pathname'
+require 'tempfile'
 
 describe RFuse::Fuse do
-   
+
     let(:dir_stat) { RFuse::Stat.directory(0444) }
     let(:file_stat) { RFuse::Stat.file(0444) }
     let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
@@ -26,7 +27,7 @@ describe RFuse::Fuse do
             fuse.mounted?.should be_false
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
-       
+
         it "should handle a Pathname as a mountpoint" do
             fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new(mountpoint))
             fuse.mounted?.should be_true
@@ -57,7 +58,7 @@ describe RFuse::Fuse do
 
             mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi | 
                 filler.push("hello",nil,0)
-                filler.push("world",nil,0)
+            filler.push("world",nil,0)
             end
 
             with_fuse(mountpoint,mockfs) do
@@ -83,38 +84,50 @@ describe RFuse::Fuse do
 
     context "timestamps" do
 
+
         it "should support stat with subsecond resolution" do
-           begin
-               atime = Time.now() + 60
-               sleep(0.001)
-           end until atime.usec != 0
+            testns = Tempfile.new("testns")
+            stat = File.stat(testns.path)
 
-           begin
-               mtime = Time.now() + 600
-               sleep(0.001)
-           end until mtime.usec != 0
+            # so if this Ruby has usec resolution for File.stat
+            # we'd expect to skip this test 1 in 100,000 times...
+            no_usecs = (stat.mtime.usec == 0)
 
-           begin
-                ctime = Time.now() + 3600
-                sleep(0.001)
-           end until ctime.usec != 0
+            if no_usecs
+                puts "Skipping due to no usec resolution for File.stat"
+            else
+                atime,mtime,ctime =  usec_times(60,600,3600)
 
-           file_stat.atime = atime
-           file_stat.mtime = mtime
-           file_stat.ctime = ctime
+                file_stat.atime = atime
+                file_stat.mtime = mtime
+                file_stat.ctime = ctime
 
+                # ruby can't set file times with ns res, o we are limited to usecs
+                mockfs.stub(:getattr).with(anything(),"/nanos").and_return(file_stat)
 
-           # ruby can't set file times with ns res, o we are limited to usecs
-           mockfs.stub(:getattr).with(anything(),"/nanos").and_return(file_stat)
-
-           with_fuse(mountpoint,mockfs) do
-               stat = File.stat("#{mountpoint}/nanos")
-               stat.atime.should == atime
-               stat.ctime.should == ctime
-               stat.mtime.should == mtime
-           end
+                with_fuse(mountpoint,mockfs) do
+                    stat = File.stat("#{mountpoint}/nanos")
+                    stat.atime.usec.should == atime.usec
+                    stat.atime.should == atime
+                    stat.ctime.should == ctime
+                    stat.mtime.should == mtime
+                end
+            end
         end
 
+        it "should set file access and modification times subsecond resolution" do
+            atime,mtime = usec_times(60,600)
+
+            atime_ns = (atime.to_i * (10**9)) + (atime.nsec) 
+            mtime_ns = (mtime.to_i * (10**9)) + (mtime.nsec)
+
+            mockfs.stub(:getattr).with(anything(),"/usec").and_return(file_stat)
+            mockfs.should_receive(:utimens).with(anything,"/usec",atime_ns,mtime_ns)
+
+            with_fuse(mountpoint,mockfs) do
+                File.utime(atime,mtime,"#{mountpoint}/usec").should == 1
+            end
+        end
         it "should set file access and modification times" do
 
             atime = Time.now()
@@ -134,12 +147,12 @@ describe RFuse::Fuse do
 
         it "should create files" do
 
-           mockfs.stub(:getattr).with(anything(),"/newfile").and_return(nil,file_stat)
-           mockfs.should_receive(:mknod).with(anything(),"/newfile",file_mode(0644),0,0)
-         
-           with_fuse(mountpoint,mockfs) do
+            mockfs.stub(:getattr).with(anything(),"/newfile").and_return(nil,file_stat)
+            mockfs.should_receive(:mknod).with(anything(),"/newfile",file_mode(0644),0,0)
+
+            with_fuse(mountpoint,mockfs) do
                 File.open("#{mountpoint}/newfile","w",0644) { |f| }
-           end
+            end
         end
 
         # ruby doesn't seem to have a native method to create these
@@ -158,7 +171,7 @@ describe RFuse::Fuse do
                 end
 
             }
-            
+
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
                 reads += 2
@@ -172,5 +185,23 @@ describe RFuse::Fuse do
                 end
             end
         end
+    end
+
+    context "exceptions" do
+
+        it "should capture exceptions appropriately" do
+
+            mockfs.should_receive(:getattr).with(anything(),"/exceptions").and_raise(RuntimeError)
+
+            with_fuse(mountpoint,mockfs) do
+                begin
+                    File.stat("#{mountpoint}/exceptions")
+                    raise "should not get here"
+                rescue Errno::ENOENT
+                    #all good
+                end
+            end
+        end
+
     end
 end

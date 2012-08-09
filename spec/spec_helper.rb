@@ -47,5 +47,17 @@ module RFuseHelper
     def tempmount()
         Dir.mktmpdir("rfuse-spec")
     end
+
+    # Generate a set of times with non-zero usec values
+    def usec_times(*increments)
+        increments.collect { |inc|
+            begin
+                time = Time.now() + inc
+                sleep(0.001)
+            end until time.usec != 0
+            time
+        }
+    end
+
 end
 include RFuseHelper

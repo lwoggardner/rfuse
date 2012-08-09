@@ -1,3 +1,12 @@
+1.0.1 / 2012/08/09
+-----------------
+
+Support Ruby 1.8 (tested with 1.8.7)
+
+Bugfixes
+
+ * {RFuse::Fuse#utimens} fixed to correctly convert time to nanoseconds
+ * Exceptions in {RFuse::Fuse#getattr} fixed to output backtrace etc
 
 1.0.0
 ----------------

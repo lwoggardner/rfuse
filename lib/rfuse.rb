@@ -1,6 +1,7 @@
 require 'fcntl'
 require 'rfuse/version'
 require 'rfuse/rfuse'
+require 'rfuse/compat'
 
 # Ruby FUSE (Filesystem in USErspace) binding
 module RFuse
@@ -30,7 +31,6 @@ module RFuse
         #
         # @return [void]
         # @raise [RFuse::Error] if already running or not mounted
-        #
         def loop()
             raise RFuse::Error, "Already running!" if @running
             raise RFuse::Error, "FUSE not mounted" unless mounted?
@@ -79,6 +79,18 @@ module RFuse
             # The FD was created by FUSE so we don't want
             # ruby to do anything with it during GC
             @fuse_io = IO.for_fd(fd(),"r",:autoclose => false) 
+        end
+
+        # Called by C unmount before doing all the FUSE stuff
+        def ruby_unmount
+            @pr.close if @pr && !@pr.closed?
+            @pw.close if @pw && !@pw.closed?
+
+            # Ideally we want this IO to avoid autoclosing at GC, but
+            # in Ruby 1.8 we have no way to do that. A work around is to close
+            # the IO here. FUSE won't necessarily like that but it is the best
+            # we can do
+            @fuse_io.close() if @fuse_io && !@fuse_io.closed? && @fuse_io.autoclose?
         end
     end
 
