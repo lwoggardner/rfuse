@@ -66,5 +66,4 @@ void context_init(VALUE module) {
   rb_define_method(cContext,"uid",context_uid,0);
   rb_define_method(cContext,"gid",context_gid,0);
   rb_define_method(cContext,"pid",context_pid,0);
-  return cContext;
 }

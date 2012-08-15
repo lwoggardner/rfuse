@@ -9,32 +9,6 @@ describe RFuse::Fuse do
     let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
     let(:mountpoint) { tempmount() }
 
-    context "mount options" do
-        it "should handle -h" do
-            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-h")
-            fuse.mounted?.should be_false
-            lambda { fuse.loop }.should raise_error(RFuse::Error)
-        end
-
-        it "should behave sensibly for bad mountpoint" do
-            fuse = RFuse::FuseDelegator.new(mockfs,"bad/mount/point")
-            fuse.mounted?.should be_false
-            lambda { fuse.loop }.should raise_error(RFuse::Error)
-        end
-
-        it "should behave sensibly for bad options" do
-            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-eviloption") 
-            fuse.mounted?.should be_false
-            lambda { fuse.loop }.should raise_error(RFuse::Error)
-        end
-
-        it "should handle a Pathname as a mountpoint" do
-            fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new(mountpoint))
-            fuse.mounted?.should be_true
-            fuse.unmount()
-        end
-    end
-
     context "links" do
         it "should create and resolve symbolic links"
 
@@ -175,13 +149,13 @@ describe RFuse::Fuse do
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
                 reads += 2
-                "hello world"[offset,reads]
+                "hello\000world"[offset,reads]
             }
 
             with_fuse(mountpoint,mockfs) do
                 File.open("#{mountpoint}/test") do |f|
                     val = f.gets
-                    val.should == "hello world"
+                    val.should == "hello\000world"
                 end
             end
         end

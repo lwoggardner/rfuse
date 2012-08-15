@@ -23,15 +23,9 @@ int intern_fuse_destroy(struct intern_fuse *inf){
   return 0;
 }
 
-int intern_fuse_init(
-  struct intern_fuse *inf,
-  struct fuse_args *args,
-  void* user_data
-  )
+int intern_fuse_init(struct intern_fuse *inf, struct fuse_args *args, void* user_data)
 {
   struct fuse_chan* fc;
-  int res;                                       
-
   char* mountpoint;
   mountpoint = inf->mountpoint;
   fc = fuse_mount(mountpoint,args);
@@ -41,6 +35,7 @@ int intern_fuse_init(
   }
 
   inf->fuse=fuse_new(fc, args, &(inf->fuse_op), sizeof(struct fuse_operations), user_data);
+
   if (inf->fuse == NULL) {
       fuse_unmount(inf->mountpoint, fc);
       return -1;
@@ -58,13 +53,14 @@ int intern_fuse_fd(struct intern_fuse *inf)
      return -1;
    }
 
-  struct fuse_chan *fc = inf->fc;
-  return fuse_chan_fd(fc);
+  return fuse_chan_fd(inf->fc);
 }
 
 //Process one fuse command (ie after IO.select)
 int intern_fuse_process(struct intern_fuse *inf)
 {
+  struct fuse_cmd *cmd;
+
   if (inf->fuse == NULL) {
     return -1;
   }
@@ -73,7 +69,6 @@ int intern_fuse_process(struct intern_fuse *inf)
     return -1;
   }
 
-  struct fuse_cmd *cmd;
   cmd = fuse_read_cmd(inf->fuse);
 
   if (cmd != NULL) {

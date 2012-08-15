@@ -10,9 +10,9 @@
 #include <fuse.h>
 #include <errno.h>
 #include <sys/statfs.h>
-//#ifdef HAVE_SETXATTR
+#ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-//#endif
+#endif
 
 #include "helper.h"
 #include "intern_rfuse.h"
@@ -23,6 +23,7 @@
 #include "pollhandle.h"
 #include "bufferwrapper.h"
 
+// Ruby 1.8 compatibility
 #ifdef HAVE_RUBY_ENCODING_H
 #include <ruby/encoding.h>
 #endif
@@ -34,9 +35,6 @@ static VALUE rb_errinfo()
 }
 #endif
 
-static VALUE mRFuse;
-static VALUE eRFuse_Error;
-
 static VALUE rb_filesystem_encode(VALUE str)
 {
 #ifdef HAVE_RUBY_ENCODING_H
@@ -45,6 +43,10 @@ static VALUE rb_filesystem_encode(VALUE str)
   return str;
 #endif
 }
+//end 1.8 compat
+
+static VALUE mRFuse;
+static VALUE eRFuse_Error;
 
 static int unsafe_return_error(VALUE *args)
 {
@@ -54,13 +56,16 @@ static int unsafe_return_error(VALUE *args)
     return rb_funcall(rb_errinfo(),rb_intern("errno"),0);
   } else {
     VALUE info;
-    info = rb_inspect(rb_errinfo());
-    printf ("ERROR: Exception %s not an Errno:: !respond_to?(:errno) \n",STR2CSTR(info)); 
-    //We need the ruby_errinfo backtrace not fuse.loop ... rb_backtrace();
-    VALUE bt_ary = rb_funcall(rb_errinfo(), rb_intern("backtrace"),0);
+    VALUE bt_ary;
     int c;
+
+    info = rb_inspect(rb_errinfo());
+    printf ("ERROR: Exception %s not an Errno:: !respond_to?(:errno) \n",StringValueCStr(info)); 
+    //We need the ruby_errinfo backtrace not fuse.loop ... rb_backtrace();
+    bt_ary = rb_funcall(rb_errinfo(), rb_intern("backtrace"),0);
+
     for (c=0;c<RARRAY_LEN(bt_ary);c++) {
-      printf("%s\n",RSTRING_PTR(RARRAY_PTR(bt_ary)[c]));
+      printf("%s\n",StringValueCStr(RARRAY_PTR(bt_ary)[c]));
     }
     return Qnil;
   }
@@ -88,7 +93,7 @@ static int return_error(int def_error)
 //Every call needs this stuff
 static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const char *path)
 {
-  args[0] = ctx->private_data;
+  args[0] = (VALUE) ctx->private_data;
   args[1] = wrap_context(ctx);
   args[2] = rb_str_new2(path);
   rb_filesystem_encode(args[2]);
@@ -107,6 +112,7 @@ static void init_context_path_args(VALUE *args,struct fuse_context *ctx,const ch
 
  @return [void]
  @raise [Errno] 
+ @todo the API for the filler could be more ruby like - eg yield
 */
 static VALUE unsafe_readdir(VALUE *args)
 {
@@ -121,7 +127,6 @@ static int rf_readdir(const char *path, void *buf,
   VALUE rfiller_instance;
   struct filler_t *fillerc;
   VALUE args[6];
-  VALUE res;
   int error = 0;
   
   struct fuse_context *ctx=fuse_get_context();
@@ -133,13 +138,13 @@ static int rf_readdir(const char *path, void *buf,
   rfiller_instance=rb_funcall(rfiller_class,rb_intern("new"),0);
   Data_Get_Struct(rfiller_instance,struct filler_t,fillerc);
 
-  fillerc->filler=filler;//Init the filler by hand.... TODO: cleaner
+  fillerc->filler=filler;
   fillerc->buffer=buf;
   args[3]=rfiller_instance;
   args[4]=INT2NUM(offset);
   args[5]=get_file_info(ffi);
 
-  res=rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
+  rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
@@ -164,12 +169,12 @@ static int rf_readlink(const char *path, char *buf, size_t size)
   VALUE args[4];
   VALUE res;
   int error = 0;
+  char *rbuf;
   
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
   args[3]=INT2NUM(size);
-  char *rbuf;
   res=rb_protect((VALUE (*)())unsafe_readlink,(VALUE)args,&error);  
   if (error)
   {
@@ -177,7 +182,7 @@ static int rf_readlink(const char *path, char *buf, size_t size)
   }
   else
   {
-    rbuf=STR2CSTR(res);
+    rbuf=StringValueCStr(res);
     strncpy(buf,rbuf,size);
     return 0;
   }
@@ -199,7 +204,6 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
   VALUE rfiller_class;
   VALUE rfiller_instance;
   VALUE args[4];
-  VALUE res;
   struct filler_t *fillerc;
   int error = 0;
 
@@ -218,7 +222,7 @@ static int rf_getdir(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 
   args[3]=rfiller_instance;
 
-  res = rb_protect((VALUE (*)())unsafe_getdir, (VALUE)args, &error);
+  rb_protect((VALUE (*)())unsafe_getdir, (VALUE)args, &error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -247,21 +251,20 @@ static VALUE unsafe_mknod(VALUE *args)
 static int rf_mknod(const char *path, mode_t mode,dev_t dev)
 {
   VALUE args[6];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
-  init_context_path_args(args,ctx,path);
- 
   int major;
   int minor;
 
+  init_context_path_args(args,ctx,path);
+ 
   major = MAJOR(dev);
   minor = MINOR(dev);
 
   args[3]=INT2FIX(mode);
   args[4]=INT2FIX(major);
   args[5]=INT2FIX(minor);
-  res=rb_protect((VALUE (*)())unsafe_mknod,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_mknod,(VALUE) args,&error);
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
@@ -330,23 +333,15 @@ static VALUE unsafe_mkdir(VALUE *args)
 static int rf_mkdir(const char *path, mode_t mode)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
   args[3]=INT2FIX(mode);
-  res=rb_protect((VALUE (*)())unsafe_mkdir,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_mkdir,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
 /*
@@ -373,7 +368,6 @@ static VALUE unsafe_open(VALUE *args)
 static int rf_open(const char *path,struct fuse_file_info *ffi)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx=fuse_get_context();
@@ -381,15 +375,9 @@ static int rf_open(const char *path,struct fuse_file_info *ffi)
 
   args[3]=wrap_file_info(ctx,ffi);
 
-  res=rb_protect((VALUE (*)())unsafe_open,(VALUE) args,&error);
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  rb_protect((VALUE (*)())unsafe_open,(VALUE) args,&error);
+  
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
 //This method is registered as a default for release in the case when
@@ -401,6 +389,7 @@ static int rf_release_ffi(const char *path, struct fuse_file_info *ffi)
   
   release_file_info(ctx,ffi);
 
+  return 0;
 }
 
 /*
@@ -426,7 +415,6 @@ static VALUE unsafe_release(VALUE *args)
 static int rf_release(const char *path, struct fuse_file_info *ffi)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx=fuse_get_context();
@@ -434,16 +422,9 @@ static int rf_release(const char *path, struct fuse_file_info *ffi)
 
   args[3]=release_file_info(ctx,ffi);
   
-  res=rb_protect((VALUE (*)())unsafe_release,(VALUE) args,&error);
- 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  rb_protect((VALUE (*)())unsafe_release,(VALUE) args,&error);
+
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
 /*
@@ -467,7 +448,6 @@ static VALUE unsafe_fsync(VALUE *args) {
 static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx=fuse_get_context();
@@ -476,16 +456,9 @@ static int rf_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
   args[3] = INT2NUM(datasync);
   args[4] = get_file_info(ffi);
 
-  res = rb_protect((VALUE (*)())unsafe_fsync,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_fsync,(VALUE) args,&error);
 
-  if (error)
-  {
-    return -(return_error(ENOENT));
-  }
-  else
-  {
-    return 0;
-  }
+  return error ? -(return_error(ENOENT)) : 0;
 }
 
 
@@ -519,12 +492,11 @@ static VALUE unsafe_flush(VALUE *args)
 static int rf_flush(const char *path,struct fuse_file_info *ffi)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=get_file_info(ffi);
-  res=rb_protect((VALUE (*)())unsafe_flush,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_flush,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -550,12 +522,11 @@ static VALUE unsafe_truncate(VALUE *args)
 static int rf_truncate(const char *path,off_t offset)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=INT2FIX(offset);
-  res=rb_protect((VALUE (*)())unsafe_truncate,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_truncate,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -584,7 +555,6 @@ static VALUE unsafe_utime(VALUE *args)
 static int rf_utime(const char *path,struct utimbuf *utim)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
   
   struct fuse_context *ctx=fuse_get_context();
@@ -592,7 +562,7 @@ static int rf_utime(const char *path,struct utimbuf *utim)
   
   args[3]=INT2NUM(utim->actime);
   args[4]=INT2NUM(utim->modtime);
-  res=rb_protect((VALUE (*)())unsafe_utime,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_utime,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -620,13 +590,12 @@ static VALUE unsafe_chown(VALUE *args)
 static int rf_chown(const char *path,uid_t uid,gid_t gid)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=INT2FIX(uid);
   args[4]=INT2FIX(gid);
-  res=rb_protect((VALUE (*)())unsafe_chown,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_chown,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -653,12 +622,11 @@ static VALUE unsafe_chmod(VALUE *args)
 static int rf_chmod(const char *path,mode_t mode)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=INT2FIX(mode);
-  res=rb_protect((VALUE (*)())unsafe_chmod,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_chmod,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -684,11 +652,10 @@ static VALUE unsafe_unlink(VALUE *args)
 static int rf_unlink(const char *path)
 {
   VALUE args[3];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
-  res=rb_protect((VALUE (*)())unsafe_unlink,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_unlink,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -714,11 +681,10 @@ static VALUE unsafe_rmdir(VALUE *args)
 static int rf_rmdir(const char *path)
 {
   VALUE args[3];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
-  res = rb_protect((VALUE (*)())unsafe_rmdir, (VALUE) args ,&error);
+  rb_protect((VALUE (*)())unsafe_rmdir, (VALUE) args ,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -746,7 +712,6 @@ static VALUE unsafe_symlink(VALUE *args){
 static int rf_symlink(const char *path,const char *as)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
@@ -754,7 +719,7 @@ static int rf_symlink(const char *path,const char *as)
   args[3]=rb_str_new2(as);
   rb_filesystem_encode(args[3]);
   
-  res=rb_protect((VALUE (*)())unsafe_symlink,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_symlink,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -781,7 +746,6 @@ static VALUE unsafe_rename(VALUE *args)
 static int rf_rename(const char *path,const char *as)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
@@ -789,7 +753,7 @@ static int rf_rename(const char *path,const char *as)
   args[3]=rb_str_new2(as);
   rb_filesystem_encode(args[3]);
   
-  res=rb_protect((VALUE (*)())unsafe_rename,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_rename,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -816,13 +780,12 @@ static VALUE unsafe_link(VALUE *args)
 static int rf_link(const char *path,const char * as)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=rb_str_new2(as);
   rb_filesystem_encode(args[3]);
-  res=rb_protect((VALUE (*)())unsafe_link,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_link,(VALUE) args,&error);
 
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -873,7 +836,6 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
   VALUE res;
   int error = 0;
   long length=0;
-  char* rbuf;
 
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
@@ -971,7 +933,7 @@ static VALUE unsafe_statfs(VALUE *args)
 
 static int rf_statfs(const char * path, struct statvfs * vfsinfo)
 {
-  VALUE args[1];
+  VALUE args[3];
   VALUE res;
   int error = 0;
 
@@ -1016,7 +978,6 @@ static int rf_setxattr(const char *path,const char *name,
            const char *value, size_t size, int flags)
 {
   VALUE args[6];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx=fuse_get_context();
@@ -1026,7 +987,7 @@ static int rf_setxattr(const char *path,const char *name,
   args[4]=rb_str_new(value,size);
   args[5]=INT2NUM(flags);
 
-  res=rb_protect((VALUE (*)())unsafe_setxattr,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_setxattr,(VALUE) args,&error);
   
   return error ? -(return_error(ENOENT)) : 0;
 }
@@ -1058,8 +1019,6 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
 {
   VALUE args[4];
   VALUE res;
-  char *rbuf;
-  long length = 0;
   int error = 0;
  
   struct fuse_context *ctx=fuse_get_context();
@@ -1103,8 +1062,6 @@ static int rf_listxattr(const char *path,char *buf, size_t size)
 {
   VALUE args[3];
   VALUE res;
-  char *rbuf;
-  size_t length =0;
   int error = 0;
   
   struct fuse_context *ctx=fuse_get_context();
@@ -1112,11 +1069,9 @@ static int rf_listxattr(const char *path,char *buf, size_t size)
   
   res=rb_protect((VALUE (*)())unsafe_listxattr,(VALUE) args,&error);
 
-  if (error)
-  {
+  if (error) {
     return -(return_error(ENOENT));
-  }
-  else {
+  } else {
     return rb_strcpy(res,buf,size);
   }
 }
@@ -1142,12 +1097,11 @@ static VALUE unsafe_removexattr(VALUE *args)
 static int rf_removexattr(const char *path,const char *name)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=rb_str_new2(name);
-  res=rb_protect((VALUE (*)())unsafe_removexattr,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_removexattr,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1177,14 +1131,13 @@ static VALUE unsafe_opendir(VALUE *args)
 static int rf_opendir(const char *path,struct fuse_file_info *ffi)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
 
   args[3]=wrap_file_info(ctx,ffi);
   
-  res=rb_protect((VALUE (*)())unsafe_opendir,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_opendir,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1210,14 +1163,13 @@ static VALUE unsafe_releasedir(VALUE *args)
 static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=release_file_info(ctx,ffi);
   
-  res=rb_protect((VALUE (*)())unsafe_releasedir,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_releasedir,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1245,13 +1197,12 @@ static VALUE unsafe_fsyncdir(VALUE *args)
 static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3]=INT2NUM(meta);
   args[4]=get_file_info(ffi);
-  res=rb_protect((VALUE (*)())unsafe_fsyncdir,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_fsyncdir,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1275,20 +1226,22 @@ static VALUE unsafe_init(VALUE* args)
 static void *rf_init(struct fuse_conn_info *conn)
 {
   VALUE args[3];
-  VALUE res;
   int error = 0;
-  
-  struct fuse_context *ctx = fuse_get_context();
+  struct fuse_context *ctx;
+ 
+  VALUE self, s, fci, fcio;
 
-  VALUE self = ctx->private_data;
+  ctx = fuse_get_context();
+
+  self = (VALUE) ctx->private_data;
 
   args[0] = self;
   args[1] = wrap_context(ctx);
 
   //Create a struct for the conn_info
   //TODO - some of these are writable!
-  VALUE s  = rb_const_get(rb_cObject,rb_intern("Struct"));
-  VALUE fci = rb_funcall(s,rb_intern("new"),7,
+  s  = rb_const_get(rb_cObject,rb_intern("Struct"));
+  fci = rb_funcall(s,rb_intern("new"),7,
     ID2SYM(rb_intern("proto_major")),
     ID2SYM(rb_intern("proto_minor")),
     ID2SYM(rb_intern("async_read")),
@@ -1298,7 +1251,7 @@ static void *rf_init(struct fuse_conn_info *conn)
     ID2SYM(rb_intern("want"))
   );
 
-  VALUE fcio = rb_funcall(fci,rb_intern("new"),7,
+  fcio = rb_funcall(fci,rb_intern("new"),7,
     UINT2NUM(conn->proto_major),
     UINT2NUM(conn->proto_minor),
     UINT2NUM(conn->async_read),
@@ -1310,50 +1263,13 @@ static void *rf_init(struct fuse_conn_info *conn)
 
   args[2] = fcio;
 
-  res = rb_protect((VALUE (*)())unsafe_init,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_init,(VALUE) args,&error);
 
-  if (error)
-  {
-    return NULL;
-  }
-  else
-  {
-    //This previously was the result of the init call (res)
-    //but it was never made available to any of the file operations
-    //and nothing was done to prevent it from being GC'd so
-    //filesystems would need to have stored it separately anyway
-    return (void *) self;
-  }
-}
-
-/*
-   Cleanup filesystem
-
-   @overload destroy()
-   @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#c41d37ab860204fe4bd7612f9fb036c5 destroy}
-
-   @param [Context] context
-
-   @return [void]
-
-   Called at filesystem exit - which itself is triggered when this fuse object
-   is garbage collected, so not sure it is actually safe to call this
-*/
-static VALUE unsafe_destroy(VALUE* args)
-{
-  return rb_funcall3(args[0],rb_intern("destroy"),1,&args[1]);
-}
-
-static void rf_destroy(void *user_data)
-{
-  VALUE args[2];
-  int error = 0;
-
-  struct fuse_context *ctx = fuse_get_context();
-  args[0] = ctx->private_data;
-  args[1] = wrap_context(ctx);
-  
-  rb_protect((VALUE (*)())unsafe_destroy,(VALUE) args,&error);
+  //This previously was the result of the init call (res)
+  //but it was never made available to any of the file operations
+  //and nothing was done to prevent it from being GC'd so
+  //filesystems would need to have stored it separately anyway
+  return error ? NULL : (void *) self;
 }
 
 /*
@@ -1377,12 +1293,11 @@ static VALUE unsafe_access(VALUE* args)
 static int rf_access(const char *path, int mask)
 {
   VALUE args[4];
-  VALUE res;
   int error = 0;
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   args[3] = INT2NUM(mask);
-  res = rb_protect((VALUE (*)())unsafe_access,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_access,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1412,7 +1327,6 @@ static VALUE unsafe_create(VALUE* args)
 static int rf_create(const char *path, mode_t mode, struct fuse_file_info *ffi)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx = fuse_get_context();
@@ -1420,7 +1334,7 @@ static int rf_create(const char *path, mode_t mode, struct fuse_file_info *ffi)
   args[3] = INT2NUM(mode);
   args[4] = wrap_file_info(ctx,ffi);
 
-  res = rb_protect((VALUE (*)())unsafe_create,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_create,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 
@@ -1450,7 +1364,6 @@ static int rf_ftruncate(const char *path, off_t size,
   struct fuse_file_info *ffi)
 {
   VALUE args[5];
-  VALUE res;
   int error = 0;
 
   struct fuse_context *ctx = fuse_get_context();
@@ -1458,7 +1371,7 @@ static int rf_ftruncate(const char *path, off_t size,
   args[3] = INT2NUM(size);
   args[4] = get_file_info(ffi);
 
-  res = rb_protect((VALUE (*)())unsafe_ftruncate,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_ftruncate,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1517,7 +1430,8 @@ static int rf_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_in
    @param [Struct] flock
 
    @return [void]
-   @raise [Errno] 
+   @raise [Errno]
+   @todo Some of the attributes of the flock struct should be writable
 
    The cmd argument will be either F_GETLK, F_SETLK or F_SETLKW.
 
@@ -1540,17 +1454,19 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
   int cmd, struct flock *lock)
 {
   VALUE args[6];
-  VALUE res;
   int error = 0;
+
+  VALUE cStruct;
+  VALUE lockc;
+  VALUE locko;
 
   struct fuse_context *ctx = fuse_get_context();
   init_context_path_args(args,ctx,path);
   
-  //TODO Wrap the struct flock so these attributes can be set
 
   //Create a struct for the lock structure
-  VALUE s  = rb_const_get(rb_cObject,rb_intern("Struct"));
-  VALUE lockc = rb_funcall(s,rb_intern("new"),5,
+  cStruct  = rb_const_get(rb_cObject,rb_intern("Struct"));
+  lockc    = rb_funcall(cStruct,rb_intern("new"),5,
     ID2SYM(rb_intern("l_type")),
     ID2SYM(rb_intern("l_whence")),
     ID2SYM(rb_intern("l_start")),
@@ -1558,7 +1474,7 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
     ID2SYM(rb_intern("l_pid"))
   );
 
-  VALUE locko = rb_funcall(lockc,rb_intern("new"),5,
+  locko = rb_funcall(lockc,rb_intern("new"),5,
     UINT2NUM(lock->l_type),
     UINT2NUM(lock->l_whence),
     UINT2NUM(lock->l_start),
@@ -1570,7 +1486,7 @@ static int rf_lock(const char *path, struct fuse_file_info *ffi,
   args[4] = INT2NUM(cmd);
   args[5] = locko;
 
-  res = rb_protect((VALUE (*)())unsafe_lock,(VALUE) args,&error);
+  rb_protect((VALUE (*)())unsafe_lock,(VALUE) args,&error);
 
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
@@ -1598,7 +1514,6 @@ static VALUE unsafe_utimens(VALUE *args)
 static int rf_utimens(const char * path, const struct timespec tv[2])
 {
   VALUE args[5];
-  VALUE res;
   int   error = 0;
 
   struct fuse_context *ctx = fuse_get_context();
@@ -1619,7 +1534,7 @@ static int rf_utimens(const char * path, const struct timespec tv[2])
     rb_intern("+"), 1, INT2NUM(tv[1].tv_nsec)
   );
   
-  res = rb_protect((VALUE (*)())unsafe_utimens,(VALUE) args, &error);
+  rb_protect((VALUE (*)())unsafe_utimens,(VALUE) args, &error);
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
@@ -1670,7 +1585,7 @@ static int rf_bmap(const char *path, size_t blocksize, uint64_t *idx)
 }
 
 //----------------------IOCTL
-
+#ifdef RFUSE_BROKEN
 static VALUE unsafe_ioctl(VALUE *args)
 {
   VALUE path  = args[0];
@@ -1682,7 +1597,7 @@ static VALUE unsafe_ioctl(VALUE *args)
 
   struct fuse_context *ctx = fuse_get_context();
 
-  return rb_funcall( ctx->private_data, rb_intern("ioctl"), 7, wrap_context(ctx),
+  return rb_funcall((VALUE) ctx->private_data, rb_intern("ioctl"), 7, wrap_context(ctx),
     path, cmd, arg, ffi, flags, data);
 }
 
@@ -1710,9 +1625,10 @@ static int rf_ioctl(const char *path, int cmd, void *arg,
 
   return 0;
 }
+#endif
 
 //----------------------POLL
-
+#ifdef RFUSE_BROKEN
 static VALUE unsafe_poll(VALUE *args)
 {
   VALUE path     = args[0];
@@ -1751,6 +1667,7 @@ static int rf_poll(const char *path, struct fuse_file_info *ffi,
   }
   return 0;
 }
+#endif
 
 /* 
    Is the filesystem successfully mounted
@@ -1794,8 +1711,11 @@ VALUE rf_unmount(VALUE self)
 VALUE rf_mountname(VALUE self)
 {
   struct intern_fuse *inf;
+  VALUE result;
+  
   Data_Get_Struct(self,struct intern_fuse,inf);
-  VALUE result = rb_str_new2(inf->mountpoint);
+
+  result = rb_str_new2(inf->mountpoint);
   rb_filesystem_encode(result);
 
   return result;
@@ -1808,7 +1728,7 @@ VALUE rf_invalidate(VALUE self,VALUE path)
 {
   struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
-  return fuse_invalidate(inf->fuse,STR2CSTR(path)); 
+  return fuse_invalidate(inf->fuse,StringValueCStr(path)); 
 }
 
 /*
@@ -1853,6 +1773,7 @@ VALUE rf_process(VALUE self)
 
 /*
 * initialize and mount the filesystem
+* @overload initialize(mountpoint,*options)
 * @param [String] mountpoint The mountpoint
 * @param [Array<String>] options fuse arguments (-h to see a list)
 */
@@ -1862,14 +1783,20 @@ static VALUE rf_initialize(
   VALUE opts)
 {
 
+  VALUE mountpoint;
+  struct intern_fuse *inf;
+  int init_result;
+  struct fuse_args *args;
+
   //Allow things like Pathname to be sent as a mountpoint
-  VALUE mountpoint = rb_obj_as_string(mountpoint_obj);
+  mountpoint = rb_obj_as_string(mountpoint_obj);
   Check_Type(opts, T_ARRAY);
 
-  struct intern_fuse *inf;
   Data_Get_Struct(self,struct intern_fuse,inf);
 
   inf->mountpoint = strdup(StringValueCStr(mountpoint));
+  
+  args = rarray2fuseargs(opts);
 
   if (RESPOND_TO(self,"getattr"))
     inf->fuse_op.getattr     = rf_getattr;
@@ -1939,8 +1866,6 @@ static VALUE rf_initialize(
     inf->fuse_op.fsyncdir    = rf_fsyncdir;
   if (RESPOND_TO(self,"init"))
     inf->fuse_op.init        = rf_init;
-//  if (RESPOND_TO(self,"destroy"))
-//    inf->fuse_op.destroy     = rf_destroy;
   if (RESPOND_TO(self,"access"))
     inf->fuse_op.access      = rf_access;
   if (RESPOND_TO(self,"ftruncate"))
@@ -1953,29 +1878,23 @@ static VALUE rf_initialize(
     inf->fuse_op.utimens     = rf_utimens;
   if (RESPOND_TO(self,"bmap"))
     inf->fuse_op.bmap        = rf_bmap;
-/*
+#ifdef RFUSE_BROKEN
   if (RESPOND_TO(self,"ioctl"))
     inf->fuse_op.ioctl       = rf_ioctl;
   if (RESPOND_TO(self,"poll"))
     inf->fuse_op.poll        = rf_poll;
-*/
+#endif
 
-  struct fuse_args *args = rarray2fuseargs(opts);
-
-  //Store our fuse object in user_data, this will be returned to use in the
-  //session context
-  void* user_data = self;
-
-  int init_result;
 
   // init_result indicates not mounted, but so does inf->fuse == NULL
   // raise exceptions only if we try to use the mount
   // can test with mounted?
-  init_result = intern_fuse_init(inf, args, user_data);
+  // Note we are storing this Ruby object as the FUSE user_data
+  init_result = intern_fuse_init(inf, args, (void *) self);
 
   //Create the open files hash where we cache FileInfo objects
-  VALUE open_files_hash;
   if (init_result == 0) {
+    VALUE open_files_hash;
     open_files_hash=rb_hash_new();
     rb_iv_set(self,"@open_files",open_files_hash);
     rb_funcall(self,rb_intern("ruby_initialize"),0);
@@ -2008,8 +1927,11 @@ void rfuse_init(VALUE module)
     //Trick Yardoc
     mRFuse = rb_define_mRFuse("RFuse");
 #endif
+  VALUE cFuse;
+
   mRFuse = module;
-  VALUE cFuse=rb_define_class_under(mRFuse,"Fuse",rb_cObject);
+      
+  cFuse = rb_define_class_under(mRFuse,"Fuse",rb_cObject);
 
   rb_define_alloc_func(cFuse,rf_new);
 

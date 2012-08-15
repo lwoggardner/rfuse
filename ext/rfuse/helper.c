@@ -1,13 +1,10 @@
 #include "helper.h"
 
-char*
-rb_compat_str2cstr(VALUE x)
-{
-  return StringValuePtr(x);
-}
-
 void rstat2stat(VALUE rstat, struct stat *statbuf)
 {
+  ID to_i;
+  VALUE r_atime,r_mtime,r_ctime;
+
   statbuf->st_dev     = FIX2ULONG(rb_funcall(rstat,rb_intern("dev"),0));
   statbuf->st_ino     = FIX2ULONG(rb_funcall(rstat,rb_intern("ino"),0));
   statbuf->st_mode    = FIX2UINT(rb_funcall(rstat,rb_intern("mode"),0));
@@ -19,11 +16,11 @@ void rstat2stat(VALUE rstat, struct stat *statbuf)
   statbuf->st_blksize = NUM2ULONG(rb_funcall(rstat,rb_intern("blksize"),0));
   statbuf->st_blocks  = NUM2ULONG(rb_funcall(rstat,rb_intern("blocks"),0));
 
-  VALUE r_atime = rb_funcall(rstat,rb_intern("atime"),0);
-  VALUE r_mtime = rb_funcall(rstat,rb_intern("mtime"),0);
-  VALUE r_ctime = rb_funcall(rstat,rb_intern("ctime"),0);
+  r_atime = rb_funcall(rstat,rb_intern("atime"),0);
+  r_mtime = rb_funcall(rstat,rb_intern("mtime"),0);
+  r_ctime = rb_funcall(rstat,rb_intern("ctime"),0);
 
-  ID to_i = rb_intern("to_i");
+  to_i = rb_intern("to_i");
 
   statbuf->st_atime = NUM2ULONG(rb_funcall(r_atime,to_i,0));
   statbuf->st_mtime = NUM2ULONG(rb_funcall(r_mtime,to_i,0));
@@ -31,7 +28,9 @@ void rstat2stat(VALUE rstat, struct stat *statbuf)
 
 //TODO: Find out the correct way to test for nano second resolution availability
 #ifdef _STATBUF_ST_NSEC
-  ID nsec = rb_intern("nsec");
+  {
+  ID nsec;
+  nsec = rb_intern("nsec");
 
   if (rb_respond_to(r_atime,nsec))
     statbuf->st_atim.tv_nsec = NUM2ULONG(rb_funcall(r_atime,nsec,0));
@@ -41,6 +40,7 @@ void rstat2stat(VALUE rstat, struct stat *statbuf)
 
   if (rb_respond_to(r_ctime,nsec))
     statbuf->st_ctim.tv_nsec = NUM2ULONG(rb_funcall(r_ctime,nsec,0));
+  }
 #endif
 
 }
@@ -71,22 +71,26 @@ void rfuseconninfo2fuseconninfo(VALUE rfuseconninfo,struct fuse_conn_info *fusec
 
 struct fuse_args * rarray2fuseargs(VALUE rarray){
 
+  int i;
+  struct fuse_args *args;
+  //TODO - we probably don't want to execute the rest if the type check fails
   Check_Type(rarray, T_ARRAY);
-  struct fuse_args *args = malloc(sizeof(struct fuse_args));
+  
+  args = malloc(sizeof(struct fuse_args));
   args->argc      = RARRAY_LEN(rarray) + 1;
   args->argv      = malloc((args->argc + 1) * sizeof(char *));
   args->allocated = 1;
 
-  int i;
-  VALUE v;
 
   args->argv[0] = strdup("");
 
   for(i = 0; i < args->argc - 1; i++) {
+      VALUE v;
       v = RARRAY_PTR(rarray)[i];
       Check_Type(v, T_STRING);
-      args->argv[i+1] = strdup(rb_string_value_ptr(&v)); //STR2CSTR(RSTRING(v));
-                                      }
+      args->argv[i+1] = strdup(rb_string_value_ptr(&v)); 
+  }
+
   args->argv[args->argc] = NULL;
                         
   return args;

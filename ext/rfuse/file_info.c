@@ -21,7 +21,7 @@ VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi) {
  
   //also store it in an open_files hash on the fuse_object
   //so it doesn't get GC'd
-  open_files = rb_iv_get(ctx->private_data,"@open_files");
+  open_files = rb_iv_get((VALUE) ctx->private_data,"@open_files");
   key        = rb_funcall(rffi,rb_intern("object_id"),0);
   rb_hash_aset(open_files,key,rffi);
 
@@ -44,13 +44,13 @@ VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
 
   if (TYPE(ffi->fh) == T_DATA) {
       VALUE rffi = ffi->fh;
-      VALUE fuse_object = ctx->private_data;
+      VALUE fuse_object = (VALUE) ctx->private_data;
       VALUE open_files = rb_iv_get(fuse_object,"@open_files");
       VALUE key = rb_funcall(rffi,rb_intern("object_id"),0);
       rb_hash_delete(open_files,key);
-  } else {
-      return Qnil;
-  }
+  } 
+
+  return Qnil;
 
 }
 
@@ -136,5 +136,4 @@ void file_info_init(VALUE module) {
      Filehandle - can be any ruby object
   */
   rb_define_attr(cFileInfo,"fh",1,1);
-  return cFileInfo;
 }

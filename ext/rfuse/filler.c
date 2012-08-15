@@ -27,18 +27,19 @@ VALUE rfiller_new(VALUE class){
  */
 VALUE rfiller_push(VALUE self, VALUE name, VALUE stat, VALUE offset) {
   struct filler_t *f;
-  Data_Get_Struct(self,struct filler_t,f);
-  //Allow nil return instead of a stat
-
   int result;
+  
+  Data_Get_Struct(self,struct filler_t,f);
 
+
+  //Allow nil return instead of a stat
   if (NIL_P(stat)) {
-    result = f->filler(f->buffer,STR2CSTR(name),NULL,NUM2LONG(offset));
+    result = f->filler(f->buffer,StringValueCStr(name),NULL,NUM2LONG(offset));
   } else {
     struct stat st;
     memset(&st, 0, sizeof(st));
     rstat2stat(stat,&st);
-    result = f->filler(f->buffer,STR2CSTR(name),&st,NUM2LONG(offset));
+    result = f->filler(f->buffer,StringValueCStr(name),&st,NUM2LONG(offset));
   }
 
   return result ? Qnil : self;
