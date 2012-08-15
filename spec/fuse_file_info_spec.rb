@@ -1,21 +1,51 @@
 require 'spec_helper'
 
 describe RFuse::Fuse do
+    
+    let(:dir_stat) { RFuse::Stat.directory(0444) }
+    let(:file_stat) { RFuse::Stat.file(0444) }
+    let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
+    let(:mountpoint) { tempmount() }
+    let(:open_files) { Hash.new() }
+    
+    it "should pass fileinfo to #release" do
+
+        file_handle = Object.new()
+        stored_ffi = nil
+        captured_ex = nil
+
+        mockfs.stub(:getattr).with(anything(),"/ffirelease").and_return(file_stat)
+
+        mockfs.should_receive(:open).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+           stored_ffi = ffi
+           ffi.fh = file_handle 
+        }
+      
+        mockfs.should_receive(:release).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+            # the return value of release is ignore, so exceptions here are lost
+            begin
+                ffi.fh.should == file_handle
+                ffi.should == stored_ffi
+            rescue Exception => ex
+                captured_ex = ex
+            end
+        }
+
+        with_fuse(mountpoint,mockfs) do
+            f1 = File.new("#{mountpoint}/ffirelease")
+            f1.close()
+        end
+
+        raise captured_ex if captured_ex
+    end
+
     context "file handles" do
         it "should retain file handles over GC" do
-            mockfs = mock("fuse")
 
-            file_stat = RFuse::Stat.file(0444,:size => 11)
+            file_stat.size = 11
 
-            mockfs.stub(:getattr) { | ctx, path|
-                case path 
-                when "/one","/two"
-                    file_stat
-                else
-                    nil
-                end
-
-            }
+            mockfs.stub(:getattr).with(anything(),"/one").and_return(file_stat)
+            mockfs.stub(:getattr).with(anything(),"/two").and_return(file_stat)
 
             open_files = {}
             mockfs.stub(:open) { |ctx,path,ffi|
@@ -29,7 +59,6 @@ describe RFuse::Fuse do
                 "hello world"
             }
 
-            mountpoint = tempmount()
             with_fuse(mountpoint,mockfs) do
                 f1 = File.new("#{mountpoint}/one")
                 f2 = File.new("#{mountpoint}/two")

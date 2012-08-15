@@ -48,6 +48,8 @@ VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
       VALUE open_files = rb_iv_get(fuse_object,"@open_files");
       VALUE key = rb_funcall(rffi,rb_intern("object_id"),0);
       rb_hash_delete(open_files,key);
+
+      return rffi;
   } 
 
   return Qnil;
