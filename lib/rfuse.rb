@@ -19,6 +19,91 @@ module RFuse
         end
     end
 
+    # Parse mount arguments and options
+    #
+    # @param [Array<String>] argv
+    #        normalised fuse options
+    #
+    # @param [Array<Symbol>] local_opts local options
+    #        if these are found in the argv entry following "-o" they are removed
+    #        from argv, ie so argv is a clean set of options that can be passed
+    #        to {RFuse::Fuse} or {RFuse::FuseDelegator}
+    #
+    # 
+    # @return [Hash{Symbol => String,Boolean}]
+    #         the extracted options
+    #
+    # @since 1.0.3
+    # 
+    # Fuse itself will normalise arguments
+    #
+    #    mount -t fuse </path/to/fs>#<device> mountpoint [options...]
+    #    mount.fuse </path/to/fs>#<device> mountpoint [options...]
+    #
+    # both result in a call to /path/to/fs with arguments...
+    #
+    #    [device] mountpoint [-h] [-o [opt,optkey=value,...]]
+    #
+    # which this method will parse into a Hash with the following special keys
+    #
+    #  :device - the optional mount device, removed from argv if present
+    #  :mountpoint - required mountpoint
+    #  :help - true if -h was supplied
+    #
+    # and any other supplied options.
+    #
+    # @example
+    #   ARGV = [ "some/device", "/mnt/point", "-h", "-o", "debug,myfs=aValue" ]
+    #   options = RFuse.parse_options(ARGV,:myfs)
+    # 
+    #   # options == 
+    #   { :device => "some/device",
+    #     :mountpoint => "/mnt/point",
+    #     :help => true,
+    #     :debug => true,
+    #     :myfs => "aValue"
+    #   }
+    #   # and ARGV == 
+    #   [ "/mnt/point","-h","-o","debug" ]
+    #
+    #   fs = create_filesystem(options)
+    #   fuse = RFuse::FuseDelegator.new(fs,*ARGV)
+    #  
+    def self.parse_options(argv,*local_opts)
+        result = Hash.new(nil)
+        
+        first_opt_index = (argv.find_index() { |opt| opt =~ /-.*/ } || argv.length ) 
+
+        result[:device] = argv.shift if first_opt_index > 1
+        result[:mountpoint] = argv[0] if argv.length > 0
+        
+        if argv.include?("-h")
+            result[:help]  =  true
+        end
+
+        opt_index = ( argv.find_index("-o") || -1 ) + 1
+
+        if opt_index > 1 && opt_index < argv.length
+            options = argv[opt_index].split(",")
+
+            options.delete_if() do |opt| 
+                opt.strip!
+
+                opt,value = opt.split("=",2)
+                value = true unless value
+                opt_sym = opt.to_sym
+                result[opt_sym] = value
+
+                #result of delete if
+                local_opts.include?(opt_sym)
+            end
+
+            argv[opt_index] = options.join(",")
+        end
+
+        result
+    end
+
     class Fuse
 
         # Main processing loop
@@ -40,7 +125,7 @@ module RFuse
                     ready, ignore, errors  = IO.select([@fuse_io,@pr],[],[@fuse_io])
 
                     if ready.include?(@pr)
-                    
+
                         @pr.getc
                         @running = false
 
@@ -75,7 +160,7 @@ module RFuse
         # afer the filesystem has been mounted successfully
         def ruby_initialize
             @pr,@pw = IO.pipe()
-            
+
             # The FD was created by FUSE so we don't want
             # ruby to do anything with it during GC
             @fuse_io = IO.for_fd(fd(),"r",:autoclose => false) 
@@ -219,5 +304,4 @@ module RFuse
             end
         end
     end
-
 end #Module RFuse
