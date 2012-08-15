@@ -1,5 +1,14 @@
-1.0.2- 2012/08/09
------------------
+1.0.3 - 2012/08/16
+------------------
+
+Cleanup compile warnings
+
+Bugfixes
+ * {RFuse::Fuse#statfs} potential segfault
+ * {RFuse::Fuse#release} not receiving FileInfo
+
+1.0.2 - 2012/08/09
+------------------
 
 Support Ruby 1.8 (tested with 1.8.7)
 
