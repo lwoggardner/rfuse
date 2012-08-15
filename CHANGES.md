@@ -39,7 +39,7 @@ with API breaking changes since the various 0.x.y series of rfuse and rfuse-ng
      command at a time. This allows the Ruby interpreter to retain control
      so you can use other threads, Signal.trap etc...
 
-  Various {RFuse::Fuse} methods will throw {Rfuse::Error} if the filesystem is
+  Various {RFuse::Fuse} methods will throw {RFuse::Error} if the filesystem is
   not mounted, which can be tested after initialisation with {RFuse::Fuse#mounted?}
 
   Implemented {RFuse::FuseDelegator} so your filesystem can be implemented (and tested/debugged)
