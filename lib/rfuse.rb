@@ -98,7 +98,11 @@ module RFuse
                 local_opts.include?(opt_sym)
             end
 
-            argv[opt_index] = options.join(",")
+            if options.empty?
+                argv.delete_at(opt_index)
+            else
+                argv[opt_index] = options.join(",")
+            end
         end
 
         result

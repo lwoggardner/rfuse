@@ -1,9 +1,18 @@
+1.0.4 -
+------------------
+
+
+Bugfixes
+
+ * {Rfuse.parse_options} fix if only local options supplied
+
 1.0.3 - 2012/08/16
 ------------------
 
 Cleanup compile warnings
 
 Bugfixes
+
  * {RFuse::Fuse#statfs} potential segfault
  * {RFuse::Fuse#release} not receiving FileInfo
 

@@ -78,6 +78,18 @@ describe RFuse do
             argv[2].should == "debug"
         end
 
+        it "should remove the only local option" do
+            argv = ["/mountpoint","-o","myoption" ]
+
+            result = RFuse.parse_options(argv,:myoption)
+
+            result[:myoption].should be_true
+
+            argv.length.should == 2
+        end
+
+
+
         it "should parse values from options" do
             argv = [ "/mountpoint", "-o", "debug,someopt=somevalue" ]
             result = RFuse.parse_options(argv)
