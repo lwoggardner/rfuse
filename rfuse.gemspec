@@ -22,6 +22,7 @@ Gem::Specification.new do |s|
   s.extra_rdoc_files = 'CHANGES.md'
 
   s.add_development_dependency("rake")
+  s.add_development_dependency("rake-compiler")
   s.add_development_dependency("rspec")
   s.add_development_dependency("yard")
   s.add_development_dependency("redcarpet")
