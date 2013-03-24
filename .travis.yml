@@ -5,6 +5,4 @@ rvm:
   - "2.0.0"
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq libfuse-dev
-  - sleep 5
-  - sudo modprobe fuse
+  - sudo apt-get install -qq libfuse-dev libfuse2
