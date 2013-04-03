@@ -135,30 +135,44 @@ describe RFuse::Fuse do
 
         it "should read files" do
 
-            file_stat.size = 11
-            mockfs.stub(:getattr) { | ctx, path|
-                case path 
-                when "/test"
-                    file_stat
-                else
-                    raise Errno::ENOENT 
-                end
+            file_stat.size = 12
+            mockfs.stub(:getattr).with(anything(),"/test").and_return(file_stat)
 
-            }
-
+            
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
                 reads += 2
-                "hello\000world"[offset,reads]
+                "hello\000world\000"[offset,reads]
             }
 
             with_fuse(mountpoint,mockfs) do
                 File.open("#{mountpoint}/test") do |f|
                     val = f.gets
-                    val.should == "hello\000world"
+                    val.should == "hello\000world\000"
                 end
             end
         end
+
+        it "should read over null characters in a real file" do
+           file_stat.size = 2
+           File.open("/tmp/nulltest","w") { |f| f.print "\000\000" }
+           
+           mockfs.stub(:getattr).with(anything(),"/testnull").and_return(file_stat)
+
+           mockfs.stub(:read) { |ctx,path,size,offset,ffi|
+               IO.read("/tmp/nulltest",size,offset)
+           }
+
+           with_fuse(mountpoint,mockfs) do
+               File.open("#{mountpoint}/testnull") do |f|
+                   val = f.gets
+                   val.should == "\000\000"
+                   val.size.should == 2
+                   puts val
+               end
+           end
+       end
+
     end
 
     context "exceptions" do
