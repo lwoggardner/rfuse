@@ -81,6 +81,10 @@ module RFuse
             result[:help]  =  true
         end
 
+        if argv.include?("-d")
+            result[:debug] = true
+        end
+
         opt_index = ( argv.find_index("-o") || -1 ) + 1
 
         if opt_index > 1 && opt_index < argv.length
@@ -99,7 +103,7 @@ module RFuse
             end
 
             if options.empty?
-                argv.delete_at(opt_index)
+                argv.slice!(opt_index - 1,2)
             else
                 argv[opt_index] = options.join(",")
             end

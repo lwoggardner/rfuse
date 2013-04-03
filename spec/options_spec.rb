@@ -67,6 +67,12 @@ describe RFuse do
             result[:debug].should be_true
         end
 
+        it "detects debug as -d" do
+            argv = [ "/mountpoint","-o","someopt","-d" ]
+            result = RFuse.parse_options(argv)
+            result[:debug].should be_true
+        end
+
         it "should remove local options" do
             argv = [ "/mountpoint","-o","debug,myoption" ]
             
@@ -75,7 +81,7 @@ describe RFuse do
             result[:debug].should be_true
             result[:myoption].should be_true
 
-            argv[2].should == "debug"
+            argv.should == [ "/mountpoint", "-o", "debug" ]
         end
 
         it "should remove the only local option" do
@@ -84,11 +90,17 @@ describe RFuse do
             result = RFuse.parse_options(argv,:myoption)
 
             result[:myoption].should be_true
-
-            argv.length.should == 2
+            argv.should == [ "/mountpoint" ]
         end
 
 
+        it "parses the value from the only local option" do
+            argv = [ "adevice", "/mountpoint", "-o","someopt=somevalue"]
+            result = RFuse.parse_options(argv,:someopt)
+
+            result[:someopt].should == "somevalue"
+            argv.should == [ "/mountpoint" ]
+        end
 
         it "should parse values from options" do
             argv = [ "/mountpoint", "-o", "debug,someopt=somevalue" ]
@@ -116,8 +128,7 @@ describe RFuse do
             result[:debug].should be_true
             result[:default_permissions].should be_true
 
-            argv.length.should == 3
-            argv.join(" ").should == "/mountpoint -o rw,debug,default_permissions"
+            argv.should == [ "/mountpoint" , "-o", "rw,debug,default_permissions" ]
         end
 
     end
