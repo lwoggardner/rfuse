@@ -5,9 +5,14 @@ require 'tempfile'
 describe RFuse::Fuse do
 
     let(:dir_stat) { RFuse::Stat.directory(0444) }
-    let(:file_stat) { RFuse::Stat.file(0444) }
-    let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
+    let(:file_stat) { RFuse::Stat.file(0444, :uid => Process.uid) }
     let(:mountpoint) { tempmount() }
+    let!(:mockfs) do
+        m = mock("fuse")
+        m.stub(:getattr).and_return(nil)
+        m.stub(:getattr).with(anything(),"/").and_return(RFuse::Stat.directory(0777))
+        m
+    end
 
     context "links" do
         it "should create and resolve symbolic links"
@@ -18,10 +23,9 @@ describe RFuse::Fuse do
 
     context "directories" do
         it "should make directories" do
-
-            mockfs.stub(:getattr).and_return(nil)
-            mockfs.stub(:getattr).with(anything(),"/aDirectory").and_return(nil,dir_stat)
-            mockfs.should_receive(:mkdir).with(anything(),"/aDirectory",anything())
+            mockfs.should_receive(:mkdir).with(anything(),"/aDirectory",anything()) do
+                mockfs.stub(:getattr).with(anything(),"/aDirectory").and_return(dir_stat)
+            end
 
             with_fuse(mountpoint,mockfs) do
                 Dir.mkdir("#{mountpoint}/aDirectory")
@@ -32,8 +36,8 @@ describe RFuse::Fuse do
 
             mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi | 
                 filler.push("hello",nil,0)
-            filler.push("world",nil,0)
-            end
+                filler.push("world",nil,0)
+            end.twice
 
             with_fuse(mountpoint,mockfs) do
                 entries = Dir.entries(mountpoint)
@@ -137,7 +141,9 @@ describe RFuse::Fuse do
 
             file_stat.size = 11
             mockfs.stub(:getattr) { | ctx, path|
-                case path 
+                case path
+                when "/"
+                    RFuse::Stat.directory(0777)
                 when "/test"
                     file_stat
                 else
@@ -164,6 +170,7 @@ describe RFuse::Fuse do
     context "exceptions" do
 
         it "should capture exceptions appropriately" do
+            pending "broken on mac" if mac?
 
             mockfs.should_receive(:getattr).with(anything(),"/exceptions").and_raise(RuntimeError)
 

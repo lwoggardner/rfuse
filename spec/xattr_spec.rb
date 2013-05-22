@@ -3,6 +3,8 @@ require 'ffi-xattr'
 
 describe RFuse::Fuse do
         it "should handle extended attributes" do
+            pending "broken on mac" if mac?
+
             mockfs = mock("fuse")
 
             file_stat = RFuse::Stat.file(0444,:size => 11)

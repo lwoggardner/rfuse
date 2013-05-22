@@ -4,9 +4,14 @@ describe RFuse::Fuse do
     
     let(:dir_stat) { RFuse::Stat.directory(0444) }
     let(:file_stat) { RFuse::Stat.file(0444) }
-    let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
     let(:mountpoint) { tempmount() }
     let(:open_files) { Hash.new() }
+    let!(:mockfs) do
+        m = mock("fuse")
+        m.stub(:getattr).and_return(nil)
+        m.stub(:getattr).with(anything(),"/").and_return(RFuse::Stat.directory(0777))
+        m
+    end
     
     it "should pass fileinfo to #release" do
 

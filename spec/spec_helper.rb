@@ -16,6 +16,10 @@ class FileModeMatcher
 end
 
 module RFuseHelper
+    def mac?
+        RUBY_PLATFORM.include?("darwin")
+    end
+
     # Runs the single threaded fuse loop
     # on a pre configured mock fuse filesystem
     # Executes fork block in a separate process
@@ -28,16 +32,25 @@ module RFuseHelper
                 fork_block.call() if fork_block
             ensure
                 sleep 0.3
-                system("fusermount -u #{mnt}")
+                if mac?
+                    system("umount #{mnt}")
+                else
+                    system("fusermount -u #{mnt}")
+                end
             end
         }
 
         fuse = RFuse::FuseDelegator.new(mockfs,mnt,*options)
-        fuse.loop
+        if mac?
+            fuse.loop rescue nil
+        else
+            fuse.loop
+        end
+
         pid,result = Process.waitpid2(fpid) 
         result.should be_success
         fuse.open_files.should be_empty()
-        fuse.mounted?.should be_false
+        fuse.mounted?.should be_false unless mac?
     end
 
     def file_mode(mode)

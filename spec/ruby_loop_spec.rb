@@ -7,7 +7,8 @@ describe RFuse do
 
     context "ruby loop" do
         it "should exit from another thread and allow multiple loops" do
-           
+            pending "broken on mac" if mac?
+
             fuse = RFuse::FuseDelegator.new(mockfs,mountpoint)
             t = Thread.new { sleep 0.5;  fuse.exit }
             fuse.loop()
@@ -39,6 +40,8 @@ describe RFuse do
             file_stat = RFuse::Stat.file(0444)
 
             thread_ran = false
+
+            mockfs.stub(:getattr).with(anything(),"/") { RFuse::Stat.directory(0777) }
 
             mockfs.stub(:getattr).with(anything(),"/before") {
                 puts "before"
