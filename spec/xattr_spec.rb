@@ -14,6 +14,8 @@ describe RFuse::Fuse do
                     "1"
                 when "user.two"
                     "2"
+                else
+                    ""
                 end
             }
 
@@ -32,8 +34,14 @@ describe RFuse::Fuse do
                 xattr['user.one'].should == "1"
                 xattr['user.two'].should == "2"
                 xattr['user.three']= "updated"
+                xattr['xxxxx'].should be_nil
                 xattr.remove('user.one')
+                # And now with a non-ruby system #TODO. There'd be a way to guard this properly
+                if system("getfattr --version")
+                    system("getfattr -d #{mountpoint}/myfile").should be_true
+                else
+                    puts "Warning Skipping getfattr test"
+                end
             end
         end
-
 end

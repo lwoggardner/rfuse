@@ -1003,7 +1003,7 @@ static int rf_setxattr(const char *path,const char *name,
    @param [String] name
 
    @return [String] attribute value
-   @raise [Errno]
+   @raise [Errno] Errno::ENODATA if attribute does not exist
 
 */
 static VALUE unsafe_getxattr(VALUE *args)

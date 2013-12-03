@@ -10,7 +10,7 @@ module RFuse
     def self.packxattr(xattrs)
         case xattrs
         when Array
-            xattrs.join("\000")
+            xattrs.join("\000").concat("\000")
         when String
             #assume already \0 separated list of keys
             xattrs
