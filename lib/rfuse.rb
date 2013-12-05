@@ -112,6 +112,15 @@ module RFuse
         result
     end
 
+    # Generate a usage string
+    #
+    # @param [String] device a description of how the device field should be used
+    # @param [String] exec the executable
+    # @return [String] the usage string
+    def self.usage(device=nil,exec=File.basename($0))
+        "Usage:\n\t #{exec} #{device} mountpoint [-h] [-o [opt,optkey=value,...]]\n"
+    end
+
     class Fuse
 
         # Main processing loop
