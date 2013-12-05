@@ -52,8 +52,11 @@ static int unsafe_return_error(VALUE *args)
 {
 
   if (rb_respond_to(rb_errinfo(),rb_intern("errno"))) {
+    VALUE res;
     //We expect these and they get passed on the fuse so be quiet...
-    return rb_funcall(rb_errinfo(),rb_intern("errno"),0);
+    res = rb_funcall(rb_errinfo(),rb_intern("errno"),0);
+    rb_set_errinfo(Qnil);
+    return res;
   } else {
     VALUE info;
     VALUE bt_ary;
