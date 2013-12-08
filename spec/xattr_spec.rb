@@ -14,12 +14,14 @@ describe RFuse::Fuse do
                     "1"
                 when "user.two"
                     "2"
+                when "user.large"
+                    "x" * 1000
                 else
                     ""
                 end
             }
 
-            mockfs.stub(:listxattr).with(anything(),"/myfile").and_return([ "user.one","user.two" ])
+            mockfs.stub(:listxattr).with(anything(),"/myfile").and_return([ "user.one","user.two","user.large" ])
             mockfs.should_receive(:setxattr).with(anything(),"/myfile","user.three","updated",anything())
             mockfs.should_receive(:removexattr).with(anything(),"/myfile","user.one")
 
@@ -29,7 +31,7 @@ describe RFuse::Fuse do
                 xattr = Xattr.new("#{mountpoint}/myfile")
                 xattr.list.should include("user.one")
                 xattr.list.should include("user.two")
-                xattr.list.size.should == 2
+                xattr.list.size.should == 3
 
                 xattr['user.one'].should == "1"
                 xattr['user.two'].should == "2"

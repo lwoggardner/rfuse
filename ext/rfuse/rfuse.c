@@ -815,7 +815,8 @@ static VALUE unsafe_read(VALUE *args)
   VALUE res;
   
   res = rb_funcall3(args[0],rb_intern("read"),5,&args[1]);
-
+  //TODO If res does not implement to_str then you'll get an exception here that
+  //is hard to debug
   return StringValue(res);
 }
 
@@ -1006,14 +1007,14 @@ static int rf_setxattr(const char *path,const char *name,
    @param [String] name
 
    @return [String] attribute value
-   @raise [Errno] Errno::ENODATA if attribute does not exist
+   @raise [Errno] Errno::ENOATTR if attribute does not exist
 
 */
 static VALUE unsafe_getxattr(VALUE *args)
 {
   VALUE res;
   res = rb_funcall3(args[0],rb_intern("getxattr"),3,&args[1]);
-
+  //TODO - exception won't should that we're calling getxattr
   return StringValue(res);
 }
 
@@ -1023,7 +1024,8 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   VALUE args[4];
   VALUE res;
   int error = 0;
- 
+  long length;
+
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
@@ -1036,7 +1038,12 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   }
   else
   {
-    return rb_strcpy(res,buf,size);
+    length = rb_strcpy(res,buf,size);
+    if (buf != NULL && length > (long) size)
+    }
+       return -ERANGE;
+    }
+    return length;
   }
 }
 
@@ -1066,16 +1073,25 @@ static int rf_listxattr(const char *path,char *buf, size_t size)
   VALUE args[3];
   VALUE res;
   int error = 0;
+  long length;
   
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
   res=rb_protect((VALUE (*)())unsafe_listxattr,(VALUE) args,&error);
 
-  if (error) {
+  if (error)
+  {
     return -(return_error(ENOENT));
-  } else {
-    return rb_strcpy(res,buf,size);
+  }
+  else
+  {
+    length = rb_strcpy(res,buf,size);
+    if (buf != NULL && length > (long) size)
+    {
+       return -ERANGE;
+    }
+    return length;
   }
 }
 
