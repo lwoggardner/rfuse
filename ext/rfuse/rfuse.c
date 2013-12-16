@@ -1039,8 +1039,8 @@ static int rf_getxattr(const char *path,const char *name,char *buf,
   else
   {
     length = rb_strcpy(res,buf,size);
-    if (buf != NULL && length > (long) size)
-    }
+    if (buf != NULL && length > ((long) size))
+    {
        return -ERANGE;
     }
     return length;
