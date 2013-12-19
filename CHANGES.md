@@ -1,11 +1,11 @@
-1.0.4 -
+1.0.4 - 2013/12/19
 ------------------
 
 
 Bugfixes
 
  * {RFuse.parse_options} fix if only local options supplied
- * Fix for listing extended attributes
+ * Fixes for extended attributes
  * Prevent old exceptions from raising at unmount
 
 1.0.3 - 2012/08/16

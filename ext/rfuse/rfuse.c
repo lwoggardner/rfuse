@@ -1456,7 +1456,7 @@ static int rf_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_in
 
    For the meaning of fields in 'struct flock' see the man page for fcntl(2). The l_whence field will always be set to SEEK_SET.
 
-   For checking lock ownership, the {FileInfo#owner} argument must be used.
+   For checking lock ownership, the FileInfo#owner argument must be used. (NOT YET IMPLEMENTED)
 
    For F_GETLK operation, the library will first check currently held locks, and if a conflicting lock is found it will return information without calling this method. This ensures, that for local locks the l_pid field is correctly filled in. The results may not be accurate in case of race conditions and in the presence of hard links, but it's unlikly that an application would rely on accurate GETLK results in these cases. If a conflicting lock is not found, this method will be called, and the filesystem may fill out l_pid by a meaningful value, or it may leave this field zero.
 
