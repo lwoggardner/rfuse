@@ -1,6 +1,7 @@
 require 'spec_helper'
 require 'pathname'
 require 'tempfile'
+require 'sys/filesystem'
 
 describe RFuse::Fuse do
 
@@ -138,7 +139,7 @@ describe RFuse::Fuse do
             file_stat.size = 12
             mockfs.stub(:getattr).with(anything(),"/test").and_return(file_stat)
 
-            
+
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
                 reads += 2
@@ -154,25 +155,61 @@ describe RFuse::Fuse do
         end
 
         it "should read over null characters in a real file" do
-           file_stat.size = 2
-           File.open("/tmp/nulltest","w") { |f| f.print "\000\000" }
-           
-           mockfs.stub(:getattr).with(anything(),"/testnull").and_return(file_stat)
+            file_stat.size = 2
+            File.open("/tmp/nulltest","w") { |f| f.print "\000\000" }
 
-           mockfs.stub(:read) { |ctx,path,size,offset,ffi|
-               IO.read("/tmp/nulltest",size,offset)
-           }
+            mockfs.stub(:getattr).with(anything(),"/testnull").and_return(file_stat)
 
-           with_fuse(mountpoint,mockfs) do
-               File.open("#{mountpoint}/testnull") do |f|
-                   val = f.gets
-                   val.should == "\000\000"
-                   val.size.should == 2
-                   puts val
-               end
-           end
-       end
+            mockfs.stub(:read) { |ctx,path,size,offset,ffi|
+                IO.read("/tmp/nulltest",size,offset)
+            }
 
+            with_fuse(mountpoint,mockfs) do
+                File.open("#{mountpoint}/testnull") do |f|
+                    val = f.gets
+                    val.should == "\000\000"
+                    val.size.should == 2
+                    puts val
+                end
+            end
+        end
+
+    end
+
+    context "filesystem statistics" do
+
+        let (:statvfs) {
+            RFuse::StatVfs.new(
+                :bsize => 2048,
+                "frsize" => 1024,
+                "blocks" =>  9999,
+                "bfree" => 8888,
+                "bavail" => 7777,
+                "files" => 6000,
+                "ffree" => 5555)
+        }
+
+        it "should report filesystem statistics" do
+            mockfs.stub(:getattr).with(anything(),"/test").and_return(dir_stat)
+            mockfs.stub(:getattr).with(anything(),"/test/statfs").and_return(file_stat)
+            
+            mockfs.should_receive(:statfs).with(anything(),"/test/statfs").and_return(statvfs)
+
+            #also exercise StatVfs
+            statvfs.f_files=6666
+
+            with_fuse(mountpoint,mockfs) do
+
+                results = Sys::Filesystem.stat("#{mountpoint}/test/statfs")
+                results.block_size.should == 2048
+                results.fragment_size.should == 1024
+                results.blocks.should == 9999
+                results.blocks_available.should == 7777
+                results.blocks_free.should == 8888
+                results.files.should == 6666
+                results.files_available == 5555
+            end
+        end
     end
 
     context "exceptions" do

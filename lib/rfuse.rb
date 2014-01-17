@@ -316,7 +316,7 @@ module RFuse
         def initialize(values={ })
             @f_bsize, @f_frsize, @f_blocks, @f_bfree, @f_bavail, @f_files, @f_ffree, @f_favail,@f_fsid, @f_flag,@f_namemax = Array.new(13,0)
             values.each_pair do |k,v|
-                prefix = k.startswith?("f_") ? "" : "f_"
+                prefix = k.to_s.start_with?("f_") ? "" : "f_"
                 instance_variable_set("@#{prefix}#{k}",v)
             end
         end
