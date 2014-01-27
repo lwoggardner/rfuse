@@ -873,7 +873,7 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
 /*
    Write data to an open file
 
-   @overload write(context,path,size,offset,ffi)
+   @overload write(context,path,data,offset,ffi)
 
    @abstract Fuse operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#897d1ece4b8b04c92d97b97b2dbf9768 write}
 
@@ -883,7 +883,7 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
    @param [Integer] offset
    @param [FileInfo] ffi
 
-   @return [Integer] exactly the number of bytes written except on error
+   @return [Integer] exactly the number of bytes requested except on error
    @raise [Errno]
 */
 static VALUE unsafe_write(VALUE *args)
