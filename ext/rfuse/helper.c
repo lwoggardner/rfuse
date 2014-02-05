@@ -12,9 +12,9 @@ void rstat2stat(VALUE rstat, struct stat *statbuf)
   statbuf->st_uid     = FIX2UINT(rb_funcall(rstat,rb_intern("uid"),0));
   statbuf->st_gid     = FIX2UINT(rb_funcall(rstat,rb_intern("gid"),0));
   statbuf->st_rdev    = FIX2ULONG(rb_funcall(rstat,rb_intern("rdev"),0));
-  statbuf->st_size    = FIX2ULONG(rb_funcall(rstat,rb_intern("size"),0));
-  statbuf->st_blksize = NUM2ULONG(rb_funcall(rstat,rb_intern("blksize"),0));
-  statbuf->st_blocks  = NUM2ULONG(rb_funcall(rstat,rb_intern("blocks"),0));
+  statbuf->st_size    = NUM2OFFT(rb_funcall(rstat,rb_intern("size"),0));
+  statbuf->st_blksize = NUM2SIZET(rb_funcall(rstat,rb_intern("blksize"),0));
+  statbuf->st_blocks  = NUM2SIZET(rb_funcall(rstat,rb_intern("blocks"),0));
 
   r_atime = rb_funcall(rstat,rb_intern("atime"),0);
   r_mtime = rb_funcall(rstat,rb_intern("mtime"),0);
