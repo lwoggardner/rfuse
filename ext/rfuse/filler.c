@@ -34,12 +34,12 @@ VALUE rfiller_push(VALUE self, VALUE name, VALUE stat, VALUE offset) {
 
   //Allow nil return instead of a stat
   if (NIL_P(stat)) {
-    result = f->filler(f->buffer,StringValueCStr(name),NULL,NUM2LONG(offset));
+    result = f->filler(f->buffer,StringValueCStr(name),NULL,NUM2OFFT(offset));
   } else {
     struct stat st;
     memset(&st, 0, sizeof(st));
     rstat2stat(stat,&st);
-    result = f->filler(f->buffer,StringValueCStr(name),&st,NUM2LONG(offset));
+    result = f->filler(f->buffer,StringValueCStr(name),&st,NUM2OFFT(offset));
   }
 
   return result ? Qnil : self;

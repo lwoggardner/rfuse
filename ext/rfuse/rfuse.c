@@ -144,7 +144,7 @@ static int rf_readdir(const char *path, void *buf,
   fillerc->filler=filler;
   fillerc->buffer=buf;
   args[3]=rfiller_instance;
-  args[4]=INT2NUM(offset);
+  args[4]=OFFT2NUM(offset);
   args[5]=get_file_info(ffi);
 
   rb_protect((VALUE (*)())unsafe_readdir,(VALUE)args,&error);
@@ -177,7 +177,7 @@ static int rf_readlink(const char *path, char *buf, size_t size)
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
-  args[3]=INT2NUM(size);
+  args[3]=SIZET2NUM(size);
   res=rb_protect((VALUE (*)())unsafe_readlink,(VALUE)args,&error);  
   if (error)
   {
@@ -844,8 +844,8 @@ static int rf_read(const char *path,char * buf, size_t size,off_t offset,struct 
   struct fuse_context *ctx=fuse_get_context();
   init_context_path_args(args,ctx,path);
   
-  args[3]=INT2NUM(size);
-  args[4]=INT2NUM(offset);
+  args[3]=SIZET2NUM(size);
+  args[4]=OFFT2NUM(offset);
   args[5]=get_file_info(ffi);
 
   res=rb_protect((VALUE (*)())unsafe_read,(VALUE) args,&error);
@@ -901,7 +901,7 @@ static int rf_write(const char *path,const char *buf,size_t size,
   init_context_path_args(args,ctx,path);
 
   args[3]=rb_str_new(buf, size);
-  args[4]=INT2NUM(offset);
+  args[4]=OFFT2NUM(offset);
   args[5]=get_file_info(ffi);
 
   res = rb_protect((VALUE (*)())unsafe_write,(VALUE) args, &error);
@@ -1387,7 +1387,7 @@ static int rf_ftruncate(const char *path, off_t size,
 
   struct fuse_context *ctx = fuse_get_context();
   init_context_path_args(args,ctx,path);
-  args[3] = INT2NUM(size);
+  args[3] = OFFT2NUM(size);
   args[4] = get_file_info(ffi);
 
   rb_protect((VALUE (*)())unsafe_ftruncate,(VALUE) args,&error);
@@ -1587,7 +1587,7 @@ static int rf_bmap(const char *path, size_t blocksize, uint64_t *idx)
 
   struct fuse_context *ctx = fuse_get_context();
   init_context_path_args(args,ctx,path);
-  args[3] = INT2NUM(blocksize);
+  args[3] = SIZET2NUM(blocksize);
   args[4] = LL2NUM(*idx);
 
   res = rb_protect((VALUE (*)())unsafe_bmap,(VALUE) args, &error);
