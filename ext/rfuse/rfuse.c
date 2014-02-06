@@ -7,9 +7,11 @@
 #include <linux/kdev_t.h>
 
 #include <ruby.h>
+#include "ruby-compat.h"
 #include <fuse.h>
 #include <errno.h>
 #include <sys/statfs.h>
+
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
@@ -23,27 +25,6 @@
 #include "pollhandle.h"
 #include "bufferwrapper.h"
 
-// Ruby 1.8 compatibility
-#ifdef HAVE_RUBY_ENCODING_H
-#include <ruby/encoding.h>
-#endif
-
-#ifndef HAVE_RB_ERRINFO
-static VALUE rb_errinfo()
-{
-    return ruby_errinfo;
-}
-#endif
-
-static VALUE rb_filesystem_encode(VALUE str)
-{
-#ifdef HAVE_RUBY_ENCODING_H
-  return rb_enc_associate(str,rb_filesystem_encoding());
-#else
-  return str;
-#endif
-}
-//end 1.8 compat
 
 static VALUE mRFuse;
 static VALUE eRFuse_Error;

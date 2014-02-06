@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <ruby.h>
+#include "ruby-compat.h"
 #include <fuse.h>
 
 #ifndef _RFUSE_HELPER_H

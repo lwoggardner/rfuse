@@ -228,5 +228,18 @@ describe RFuse::Fuse do
             end
         end
 
+        it "should pass Errno exceptions through" do
+            mockfs.should_receive(:getattr).with(anything(),"/exceptions").and_raise(Errno::EPERM)
+
+            with_fuse(mountpoint,mockfs) do
+                begin
+                    File.stat("#{mountpoint}/exceptions")
+                    raise "should not get here"
+                rescue Errno::EPERM
+                    #all good
+                end
+            end
+        end
+
     end
 end
