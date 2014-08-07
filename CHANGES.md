@@ -1,4 +1,4 @@
-1.0.6 - 2014/MM/DD
+1.1.0 - 2014/MM/DD
 ------------------
 
  * {RFuse::Fuse#trap_signals} a clean way of handling signals (with the self-pipe previously used for a graceful exit)

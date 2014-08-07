@@ -150,7 +150,7 @@ module RFuse
     # @yieldreturn [Error]
     #   raise {Error} with appropriate message for invalid options
     #
-    # @since 1.0.6
+    # @since 1.1.0
     #
     # @example
     #
@@ -284,6 +284,7 @@ module RFuse
         #   Default is all available signals. See {#trap_signals}
         #
         # @return [void]
+        # @since 1.1.0
         # @see RFuse.main
         def run(signals=Signal.list.keys)
             if mounted?
@@ -366,6 +367,7 @@ module RFuse
         #
         # @return [Array<String>] List of signal names that traps have been set for.
         #
+        # @since 1.1.0
         #
         # @example
         #   class MyFS < Fuse
@@ -485,6 +487,7 @@ module RFuse
         #
         # @return [Boolean] whether debugging information should be printed to $stderr around each fuse method.
         #    Defaults to $DEBUG
+        # @since 1.1.0
         # @see #sigusr1
         def debug?
             @debug
@@ -493,6 +496,7 @@ module RFuse
         # Set debugging on or off
         # @param [Boolean] value enable or disable debugging
         # @return [Boolean] the new debug value
+        # @since 1.1.0
         def debug=(value)
             value = value ? true : false
             if @debug && !value
