@@ -56,6 +56,9 @@ VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
 
 }
 
+/*
+ * @private
+*/
 VALUE file_info_initialize(VALUE self){
   return self;
 }
@@ -135,7 +138,7 @@ void file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"nonseekable=",file_info_nonseekable_assign,1);
   
   /*
-     Filehandle - can be any ruby object
+     @return [Object] user specified filehandle object. See {Fuse#open}
   */
   rb_define_attr(cFileInfo,"fh",1,1);
 }

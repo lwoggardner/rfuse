@@ -7,7 +7,7 @@ VALUE rfiller_initialize(VALUE self){
 }
 
 /*
-* @api private Never called
+* @private Never called
 */
 VALUE rfiller_new(VALUE class){
   VALUE self;
