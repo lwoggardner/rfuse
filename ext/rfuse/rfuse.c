@@ -1778,18 +1778,32 @@ VALUE rf_process(VALUE self)
 * @param [Array<String>] options fuse arguments (-h to see a list)
 */
 static VALUE rf_initialize(
-  VALUE self,
-  VALUE mountpoint_obj,
-  VALUE opts)
+  int argc,
+  VALUE* argv,
+  VALUE self)
 {
 
+  VALUE opts;
+  VALUE first_opt;
+  VALUE mountpoint_arg;
   VALUE mountpoint;
   struct intern_fuse *inf;
   int init_result;
   struct fuse_args *args;
 
+  rb_scan_args(argc, argv, "1*",&mountpoint_arg, &opts);
+
+  // Allow pre 1.0.6 style Fuse which forced options to be passed as an array
+  if (RARRAY_LEN(opts) == 1) {
+      first_opt = rb_ary_entry(opts,0);
+      if (TYPE(first_opt) == T_ARRAY) {
+         opts = first_opt;
+      }
+  }
   //Allow things like Pathname to be sent as a mountpoint
-  mountpoint = rb_obj_as_string(mountpoint_obj);
+  mountpoint = rb_obj_as_string(mountpoint_arg);
+
+  //Is this redundant if scan_args has populted opts?
   Check_Type(opts, T_ARRAY);
 
   Data_Get_Struct(self,struct intern_fuse,inf);
@@ -1930,12 +1944,17 @@ void rfuse_init(VALUE module)
   VALUE cFuse;
 
   mRFuse = module;
+ 
+  // The underlying FUSE library major version
+  rb_define_const(mRFuse,"FUSE_MAJOR_VERSION",INT2FIX(FUSE_MAJOR_VERSION));
+  // The underlyfing FUSE library minor versoin
+  rb_define_const(mRFuse,"FUSE_MINOR_VERSION",INT2FIX(FUSE_MINOR_VERSION));
       
   cFuse = rb_define_class_under(mRFuse,"Fuse",rb_cObject);
 
   rb_define_alloc_func(cFuse,rf_new);
 
-  rb_define_method(cFuse,"initialize",rf_initialize,2);
+  rb_define_method(cFuse,"initialize",rf_initialize,-1);
   rb_define_method(cFuse,"mounted?",rf_mounted,0);
   rb_define_method(cFuse,"invalidate",rf_invalidate,1);
   rb_define_method(cFuse,"unmount",rf_unmount,0);
@@ -1978,7 +1997,6 @@ void rfuse_init(VALUE module)
   rb_define_method(cFuse,"releasedir",unsafe_releasedir,0);
   rb_define_method(cFuse,"fsyncdir",unsafe_fsyncdir,0);
   rb_define_method(cFuse,"init",unsafe_init,0);
-  rb_define_method(cFuse,"destroy",unsafe_destroy,0);
   rb_define_method(cFuse,"access",unsafe_access,0);
   rb_define_method(cFuse,"create",unsafe_create,0);
   rb_define_method(cFuse,"ftruncate",unsafe_ftruncate,0);
