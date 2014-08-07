@@ -111,7 +111,7 @@ class MyFile
     end
     def size
         return content.size
-    end 
+    end
     def isdir
         false
     end
@@ -127,7 +127,7 @@ class MyFile
     end
 end
 
-class MyFuse 
+class MyFuse
 
     def initialize(root)
         @root=root
@@ -137,7 +137,7 @@ class MyFuse
     def readdir(ctx,path,filler,offset,ffi)
         d=@root.search(path)
         if d.isdir then
-            d.each {|name,obj| 
+            d.each {|name,obj|
                 filler.push(name,obj.stat,0)
             }
         else
@@ -211,7 +211,7 @@ class MyFuse
 
     def read(ctx,path,size,offset,fi)
         d = @root.search(path)
-        if (d.isdir) 
+        if (d.isdir)
             raise Errno::EISDIR.new(path)
             return nil
         else
@@ -221,7 +221,7 @@ class MyFuse
 
     def write(ctx,path,buf,offset,fi)
         d=@root.search(path)
-        if (d.isdir) 
+        if (d.isdir)
             raise Errno::EISDIR.new(path)
         else
             d.content[offset..offset+buf.length - 1] = buf
@@ -236,7 +236,7 @@ class MyFuse
 
     def getxattr(ctx,path,name)
         d=@root.search(path)
-        if (d) 
+        if (d)
             value=d.getxattr(name)
             if (!value)
                 value=""
@@ -307,33 +307,4 @@ class MyFuse
 
 end #class Fuse
 
-if ARGV.length == 0
-    print "\n"
-    print "Usage: [ruby [--debug]] #{$0} mountpoint [mount_options...]\n"
-    print "\n"
-    print "   mountpoint must be an existing directory\n"
-    print "   mount_option '-h' will list supported options\n"
-    print "\n"
-    print "   For verbose debugging output use --debug to ruby\n"
-    print "   and '-odebug' as mount_option\n"
-    print "\n"
-    exit(1)
-end
-
-fs = MyFuse.new(MyDir.new("",0777));
-
-fo = RFuse::FuseDelegator.new(fs,*ARGV)
-
-if fo.mounted?
-    Signal.trap("TERM") { print "Caught TERM\n" ; fo.exit }
-    Signal.trap("INT") { print "Caught INT\n"; fo.exit }
-
-    begin
-        fo.loop
-    rescue
-        print "Error:" + $!
-    ensure
-        fo.unmount if fo.mounted?
-        print "Unmounted #{ARGV[0]}\n"
-    end
-end
+RFuse.main(ARGV) { fs = MyFuse.new(MyDir.new("",0777)) }

@@ -20,25 +20,23 @@ Dependencies
 Installation
 ---------------
 
-    $ gem install rfuse
+    gem install rfuse
 
 Creating a filesystem
 ---------------------------
 
-Extend and implement the abstract methods of {RFuse::Fuse} (See also {RFuse::FuseDelegator})
+Create your filesystem as a class implementing the abstract FUSE methods from {RFuse::Fuse} as necessary.
+
+Run it with {RFuse.main}
 
 For a sample filesystem see sample/test-ruby.rb
 
 To run the example:
 
-     $ mkdir /tmp/fuse
-     $ ruby sample/test-ruby.rb /tmp/fuse
+     mkdir /tmp/fuse
+     ruby sample/test-ruby.rb /tmp/fuse
 
-..and there should be an empty in-memory filesystem mounted at /tmp/fuse
-
-     $ fusermount -u /tmp/fuse
-
-...should stop the example filesystem program.
+there should be some interesting content in the filesystem mounted at `/tmp/fuse`
 
 HISTORY
 ======

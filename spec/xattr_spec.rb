@@ -40,7 +40,7 @@ describe RFuse::Fuse do
                 xattr.remove('user.one')
                 # And now with a non-ruby system #TODO. There'd be a way to guard this properly
                 if system("getfattr --version")
-                    system("getfattr -d #{mountpoint}/myfile").should be_true
+                    system("getfattr -d #{mountpoint}/myfile > /dev/null").should be(true)
                 else
                     puts "Warning Skipping getfattr test"
                 end

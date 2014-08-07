@@ -1,3 +1,10 @@
+1.0.6 - 2014/MM/DD
+------------------
+
+ * {RFuse::Fuse#trap_signals} a clean way of handling signals (with the self-pipe previously used for a graceful exit)
+ * Default signal handlers for "INT","TERM" (exit fuse), "USR1" (toggle FuseDelegator debugging)
+ * Introduce {RFuse.main} as Ruby equivalent of fuse_main() convenience method for starting filesystems
+
 1.0.5 - 2014/04/16
 ------------------
 

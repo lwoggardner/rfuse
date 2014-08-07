@@ -12,25 +12,25 @@ describe RFuse do
     context "mount options" do
         it "should handle -h" do
             fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-h")
-            fuse.mounted?.should be_false
+            fuse.mounted?.should be_falsey
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
 
         it "should behave sensibly for bad mountpoint" do
             fuse = RFuse::FuseDelegator.new(mockfs,"bad/mount/point")
-            fuse.mounted?.should be_false
+            fuse.mounted?.should be_falsey
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
 
         it "should behave sensibly for bad options" do
-            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-eviloption") 
-            fuse.mounted?.should be_false
+            fuse = RFuse::FuseDelegator.new(mockfs,mountpoint,"-eviloption")
+            fuse.mounted?.should be_falsey
             lambda { fuse.loop }.should raise_error(RFuse::Error)
         end
 
         it "should handle a Pathname as a mountpoint" do
             fuse = RFuse::FuseDelegator.new(mockfs,Pathname.new(mountpoint))
-            fuse.mounted?.should be_true
+            fuse.mounted?.should be(true)
             fuse.unmount()
         end
     end
@@ -40,46 +40,46 @@ describe RFuse do
         it "should detect -h" do
             argv = [ "/mountpoint","-h" ]
             result = RFuse.parse_options(argv)
-            
-            result[:help].should be_true
+
+            result[:help].should be(true)
             result[:mountpoint].should == "/mountpoint"
-            result[:debug].should be_false
+            result[:debug].should be_falsey
         end
 
         it "should detect -h mixed with -o" do
             argv = [ "/mountpoint","-h", "-o", "debug" ]
             result = RFuse.parse_options(argv)
-            
-            result[:help].should be_true
+
+            result[:help].should be(true)
             result[:mountpoint].should == "/mountpoint"
-            result[:debug].should be_true
+            result[:debug].should be(true)
         end
 
         it "should detect debug" do
             argv = [ "/mountpoint","-o","debug" ]
             result = RFuse.parse_options(argv)
 
-            result[:debug].should be_true
-            result[:help].should be_false
+            result[:debug].should be(true)
+            result[:help].should be_falsey
 
             argv = [ "/mountpoint","-o","default_permissions,debug" ]
             result = RFuse.parse_options(argv)
-            result[:debug].should be_true
+            result[:debug].should be(true)
         end
 
         it "detects debug as -d" do
             argv = [ "/mountpoint","-o","someopt","-d" ]
             result = RFuse.parse_options(argv)
-            result[:debug].should be_true
+            result[:debug].should be(true)
         end
 
         it "should remove local options" do
             argv = [ "/mountpoint","-o","debug,myoption" ]
-            
+
             result = RFuse.parse_options(argv,:myoption)
 
-            result[:debug].should be_true
-            result[:myoption].should be_true
+            result[:debug].should be(true)
+            result[:myoption].should be(true)
 
             argv.should == [ "/mountpoint", "-o", "debug" ]
         end
@@ -89,7 +89,7 @@ describe RFuse do
 
             result = RFuse.parse_options(argv,:myoption)
 
-            result[:myoption].should be_true
+            result[:myoption].should be(true)
             argv.should == [ "/mountpoint" ]
         end
 
@@ -124,9 +124,9 @@ describe RFuse do
 
             result[:device].should == "a device"
             result[:mountpoint].should == "/mountpoint"
-            result[:rw].should be_true
-            result[:debug].should be_true
-            result[:default_permissions].should be_true
+            result[:rw].should be(true)
+            result[:debug].should be(true)
+            result[:default_permissions].should be(true)
 
             argv.should == [ "/mountpoint" , "-o", "rw,debug,default_permissions" ]
         end

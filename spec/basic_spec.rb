@@ -12,7 +12,6 @@ describe RFuse::Fuse do
 
     context "links" do
         it "should create and resolve symbolic links"
-
         it "should create and resolve hard links"
 
     end
@@ -31,7 +30,7 @@ describe RFuse::Fuse do
 
         it "should list directories" do
 
-            mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi | 
+            mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi |
                 filler.push("hello",nil,0)
             filler.push("world",nil,0)
             end
@@ -93,7 +92,7 @@ describe RFuse::Fuse do
         it "should set file access and modification times subsecond resolution" do
             atime,mtime = usec_times(60,600)
 
-            atime_ns = (atime.to_i * (10**9)) + (atime.nsec) 
+            atime_ns = (atime.to_i * (10**9)) + (atime.nsec)
             mtime_ns = (mtime.to_i * (10**9)) + (mtime.nsec)
 
             mockfs.stub(:getattr).with(anything(),"/usec").and_return(file_stat)
@@ -169,7 +168,6 @@ describe RFuse::Fuse do
                     val = f.gets
                     val.should == "\000\000"
                     val.size.should == 2
-                    puts val
                 end
             end
         end
@@ -192,7 +190,7 @@ describe RFuse::Fuse do
         it "should report filesystem statistics" do
             mockfs.stub(:getattr).with(anything(),"/test").and_return(dir_stat)
             mockfs.stub(:getattr).with(anything(),"/test/statfs").and_return(file_stat)
-            
+
             mockfs.should_receive(:statfs).with(anything(),"/test/statfs").and_return(statvfs)
 
             #also exercise StatVfs

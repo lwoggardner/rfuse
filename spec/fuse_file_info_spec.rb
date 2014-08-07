@@ -1,13 +1,13 @@
 require 'spec_helper'
 
 describe RFuse::Fuse do
-    
+
     let(:dir_stat) { RFuse::Stat.directory(0444) }
     let(:file_stat) { RFuse::Stat.file(0444) }
     let!(:mockfs) { m = mock("fuse"); m.stub(:getattr).and_return(nil); m }
     let(:mountpoint) { tempmount() }
     let(:open_files) { Hash.new() }
-    
+
     it "should pass fileinfo to #release" do
 
         file_handle = Object.new()
@@ -18,15 +18,15 @@ describe RFuse::Fuse do
 
         mockfs.should_receive(:open).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
            stored_ffi = ffi
-           ffi.fh = file_handle 
+           ffi.fh = file_handle
         }
-      
+
         mockfs.should_receive(:release).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
             # the return value of release is ignore, so exceptions here are lost
             begin
                 ffi.fh.should == file_handle
                 ffi.should == stored_ffi
-            rescue Exception => ex
+            rescue => ex
                 captured_ex = ex
             end
         }
@@ -64,7 +64,7 @@ describe RFuse::Fuse do
                 f2 = File.new("#{mountpoint}/two")
 
                 val = f1.gets
-                val.should == "hello world" 
+                val.should == "hello world"
                 f2.gets.should == "hello world"
 
                 f1.close()

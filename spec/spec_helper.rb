@@ -15,6 +15,14 @@ class FileModeMatcher
     end
 end
 
+module DoubleAliases
+  def mock(*args, &block)
+    double(*args, &block)
+  end
+  alias stub mock
+end
+
+
 module RFuseHelper
     # Runs the single threaded fuse loop
     # on a pre configured mock fuse filesystem
@@ -22,22 +30,34 @@ module RFuseHelper
     # that is expected to return success
     def with_fuse(mnt,mockfs,*options,&fork_block)
 
-        fpid = Kernel.fork() {
-            sleep 0.5
+        fuse = RFuse::FuseDelegator.new(mockfs,mnt,*options)
+        fuse.mounted?.should be(true)
+        fork_fuse(fuse) do
             begin
                 fork_block.call() if fork_block
             ensure
-                sleep 0.3
-                system("fusermount -u #{mnt}")
+                fusermount(mnt)
             end
-        }
-
-        fuse = RFuse::FuseDelegator.new(mockfs,mnt,*options)
-        fuse.loop
-        pid,result = Process.waitpid2(fpid) 
-        result.should be_success
+        end
         fuse.open_files.should be_empty()
-        fuse.mounted?.should be_false
+        fuse.mounted?.should be(false)
+    end
+
+    def fork_fuse(fuse,&fork_block)
+
+        fpid = Kernel.fork() { fork_block.call() }
+
+        fuse.loop
+
+        pid,result = Process.waitpid2(fpid)
+        result.should be_success
+    end
+
+    def fusermount(mnt)
+        unless system("fusermount -u #{mnt} >/dev/null 2>&1")
+            sleep(0.5)
+            system("fusermount -u #{mnt}")
+        end
     end
 
     def file_mode(mode)
@@ -60,4 +80,22 @@ module RFuseHelper
     end
 
 end
-include RFuseHelper
+
+RSpec.configure do |config|
+  config.expect_with :rspec do |c|
+    c.syntax = [:should, :expect]
+  end
+  config.mock_with :rspec do |c|
+    c.syntax = [:should, :expect]
+  end
+
+  config.after(:suite) do
+      Dir.glob(Dir.tmpdir + "/rfuse-spec*") do |dir|
+          system("fusermount -u #{dir} >/dev/null 2>&1")
+          FileUtils.remove_dir(dir)
+      end
+  end
+
+  config.include RFuseHelper
+  config.include DoubleAliases
+end
