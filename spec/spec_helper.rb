@@ -91,8 +91,16 @@ RSpec.configure do |config|
 
   config.after(:suite) do
       Dir.glob(Dir.tmpdir + "/rfuse-spec*") do |dir|
-          system("fusermount -u #{dir} >/dev/null 2>&1")
-          FileUtils.remove_dir(dir)
+          count = 0
+          begin
+            system("fusermount -u #{dir} >/dev/null 2>&1")
+            FileUtils.rmdir(dir)
+          rescue Errno::EBUSY
+            #puts "Cleaning up #{dir} is busy, retrying..."
+            sleep(0.5)
+            count = count + 1
+            retry unless count > 3
+          end
       end
   end
 
