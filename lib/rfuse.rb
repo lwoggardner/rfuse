@@ -289,10 +289,10 @@ module RFuse
         def run(signals=Signal.list.keys)
             if mounted?
                 begin
-                    # The signals parameter is only there for testing
-                    trap_signals(*signals)
+                    traps = trap_signals(*signals)
                     self.loop()
                 ensure
+                    traps.each { |t| Signal.trap(t,"DEFAULT") }
                     unmount()
                 end
             end
@@ -407,6 +407,8 @@ module RFuse
         # Called by the C iniitialize
         # afer the filesystem has been mounted successfully
         def ruby_initialize
+            @running = false
+
             # Self-pipe for handling signals and exit
             @pr,@pw = IO.pipe()
 
@@ -417,7 +419,6 @@ module RFuse
 
         # Called by C unmount before doing all the FUSE stuff
         def ruby_unmount
-            # TODO - probably should undo traps
             @pr.close if @pr && !@pr.closed?
             @pw.close if @pw && !@pw.closed?
 
