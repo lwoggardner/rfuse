@@ -32,7 +32,7 @@ describe RFuse::Fuse do
 
             mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi |
                 filler.push("hello",nil,0)
-            filler.push("world",nil,0)
+                filler.push("world",nil,0)
             end
 
             with_fuse(mountpoint,mockfs) do

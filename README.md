@@ -36,7 +36,7 @@ To run the example:
      mkdir /tmp/fuse
      ruby sample/test-ruby.rb /tmp/fuse
 
-there should be some interesting content in the filesystem mounted at `/tmp/fuse`
+there should be an empty in-memory filesystem mounted at `/tmp/fuse`
 
 HISTORY
 ======

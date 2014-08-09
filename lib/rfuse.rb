@@ -355,7 +355,7 @@ module RFuse
         # The filesystem supports a signal by providing a `sig<name>` method. eg {#sigint}
         #
         # The fuse {#loop} is notified of the signal via the self-pipe trick, and calls the corresponding
-        #   `sig<name>` method, after amy current filesystem operation completes.
+        #   `sig<name>` method, after any current filesystem operation completes.
         #
         # This method will not override traps that have previously been set to something other than "DEFAULT"
         #
@@ -396,7 +396,8 @@ module RFuse
         end
 
         # Default signal handler to exit on TERM/INT
-        # See {#trap_signals}
+        # @return [void]
+        # @see #trap_signals
         def sigterm
             @running = false
         end
@@ -478,6 +479,7 @@ module RFuse
         end
 
         # USR1 sig handler - toggle debugging of fuse methods
+        # @return [void]
         def sigusr1()
             self.debug=!@debug
         end
