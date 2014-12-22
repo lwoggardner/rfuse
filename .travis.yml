@@ -9,7 +9,7 @@ before_install:
   - sudo apt-get install -y libfuse-dev
 
 script:
-  - bundle exec rake test
+  - bundle exec rake spec
 
 cache:
   bundler: true
