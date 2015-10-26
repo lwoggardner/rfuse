@@ -74,7 +74,7 @@ module RFuse
     def self.parse_options(argv,*local_opts)
         result = Hash.new(nil)
 
-        first_opt_index = (argv.find_index() { |opt| opt =~ /-.*/ } || argv.length )
+        first_opt_index = (argv.find_index() { |opt| opt =~ /^-.*/ } || argv.length )
 
         result[:device] = argv.shift if first_opt_index > 1
         result[:mountpoint] = argv[0] if argv.length > 0
