@@ -131,5 +131,13 @@ describe RFuse do
             argv.should == [ "/mountpoint" , "-o", "rw,debug,default_permissions" ]
         end
 
+        context "with '-' in device" do
+            it "should parse the device correctly" do
+                argv = [ "a-device", "/mountpoint" , "-o", "rw,debug,default_permissions" ]
+                result = RFuse.parse_options(argv)
+
+                result[:device].should == "a-device"
+            end
+        end
     end
 end
