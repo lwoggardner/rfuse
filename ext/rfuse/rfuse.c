@@ -1156,8 +1156,7 @@ static int rf_opendir(const char *path,struct fuse_file_info *ffi)
 */
 static VALUE unsafe_releasedir(VALUE *args)
 {
-
-  return rb_funcall(args[0],rb_intern("releasedir"),3,&args[1]);
+ return rb_funcall3(args[0],rb_intern("releasedir"),3,&args[1]);
 }
 
 static int rf_releasedir(const char *path,struct fuse_file_info *ffi)

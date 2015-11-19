@@ -22,7 +22,7 @@ describe RFuse::Fuse do
         }
 
         mockfs.should_receive(:release).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
-            # the return value of release is ignore, so exceptions here are lost
+            # the return value of release is ignored, so exceptions here are lost
             begin
                 ffi.fh.should == file_handle
                 ffi.should == stored_ffi
@@ -36,7 +36,45 @@ describe RFuse::Fuse do
             f1.close()
         end
 
-        raise captured_ex if captured_ex
+        captured_ex.should be_nil
+    end
+
+    it "should pass fileinfo to #releasedir" do
+
+        file_handle = Object.new()
+        stored_ffi = nil
+        captured_ex = nil
+
+        mockfs.stub(:getattr).with(anything(),"/ffirelease").and_return(dir_stat)
+
+        mockfs.should_receive(:opendir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+            stored_ffi = ffi
+            ffi.fh = file_handle
+        }
+
+        mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi |
+            filler.push("hello",nil,0)
+            filler.push("world",nil,0)
+        end
+
+        mockfs.should_receive(:releasedir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+            # the return value of release is ignored, so exceptions here are lost
+            begin
+                ffi.fh.should == file_handle
+                ffi.should == stored_ffi
+            rescue => ex
+                captured_ex = ex
+            end
+        }
+
+        with_fuse(mountpoint,mockfs) do
+            entries = Dir.entries("#{mountpoint}/ffirelease")
+            entries.size.should == 2
+            entries.should include("hello")
+            entries.should include("world")
+        end
+
+        captured_ex.should be_nil
     end
 
     context "file handles" do
