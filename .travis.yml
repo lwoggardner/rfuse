@@ -11,7 +11,6 @@ before_install:
   - sudo modprobe fuse
   - sudo chmod 666 /dev/fuse
   - sudo chown root:$USER /etc/fuse.conf
-  - sudo apt-get install -y libfuse-dev
 
 script:
   - bundle exec rake spec
