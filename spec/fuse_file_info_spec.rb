@@ -19,6 +19,7 @@ describe RFuse::Fuse do
         mockfs.should_receive(:open).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
            stored_ffi = ffi
            ffi.fh = file_handle
+           ctx.uid.should > 0
         }
 
         mockfs.should_receive(:release).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
@@ -26,7 +27,9 @@ describe RFuse::Fuse do
             begin
                 ffi.fh.should == file_handle
                 ffi.should == stored_ffi
-            rescue => ex
+                # Not sure why ctx.uid is not still set during release
+                ctx.uid.should == 0
+            rescue Exception => ex
                 captured_ex = ex
             end
         }
@@ -36,7 +39,7 @@ describe RFuse::Fuse do
             f1.close()
         end
 
-        captured_ex.should be_nil
+        raise captured_ex if captured_ex
     end
 
     it "should pass fileinfo to #releasedir" do
@@ -50,6 +53,7 @@ describe RFuse::Fuse do
         mockfs.should_receive(:opendir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
             stored_ffi = ffi
             ffi.fh = file_handle
+            ctx.uid.should > 0
         }
 
         mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi |
@@ -62,7 +66,9 @@ describe RFuse::Fuse do
             begin
                 ffi.fh.should == file_handle
                 ffi.should == stored_ffi
-            rescue => ex
+                # Not entirely sure why ctx.uid is not set here
+                ctx.uid.should == 0
+            rescue Exception => ex
                 captured_ex = ex
             end
         }
@@ -74,7 +80,7 @@ describe RFuse::Fuse do
             entries.should include("world")
         end
 
-        captured_ex.should be_nil
+        raise captured_ex if captured_ex
     end
 
     context "file handles" do
