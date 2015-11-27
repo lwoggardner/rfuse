@@ -19,14 +19,17 @@ describe RFuse::Fuse do
         mockfs.should_receive(:open).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
            stored_ffi = ffi
            ffi.fh = file_handle
+           ctx.uid.should > 0
         }
 
         mockfs.should_receive(:release).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
-            # the return value of release is ignore, so exceptions here are lost
+            # the return value of release is ignored, so exceptions here are lost
             begin
                 ffi.fh.should == file_handle
                 ffi.should == stored_ffi
-            rescue => ex
+                # Not sure why ctx.uid is not still set during release
+                ctx.uid.should == 0
+            rescue Exception => ex
                 captured_ex = ex
             end
         }
@@ -34,6 +37,47 @@ describe RFuse::Fuse do
         with_fuse(mountpoint,mockfs) do
             f1 = File.new("#{mountpoint}/ffirelease")
             f1.close()
+        end
+
+        raise captured_ex if captured_ex
+    end
+
+    it "should pass fileinfo to #releasedir" do
+
+        file_handle = Object.new()
+        stored_ffi = nil
+        captured_ex = nil
+
+        mockfs.stub(:getattr).with(anything(),"/ffirelease").and_return(dir_stat)
+
+        mockfs.should_receive(:opendir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+            stored_ffi = ffi
+            ffi.fh = file_handle
+            ctx.uid.should > 0
+        }
+
+        mockfs.should_receive(:readdir) do | ctx, path, filler,offset,ffi |
+            filler.push("hello",nil,0)
+            filler.push("world",nil,0)
+        end
+
+        mockfs.should_receive(:releasedir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
+            # the return value of release is ignored, so exceptions here are lost
+            begin
+                ffi.fh.should == file_handle
+                ffi.should == stored_ffi
+                # Not entirely sure why ctx.uid is not set here
+                ctx.uid.should == 0
+            rescue Exception => ex
+                captured_ex = ex
+            end
+        }
+
+        with_fuse(mountpoint,mockfs) do
+            entries = Dir.entries("#{mountpoint}/ffirelease")
+            entries.size.should == 2
+            entries.should include("hello")
+            entries.should include("world")
         end
 
         raise captured_ex if captured_ex
