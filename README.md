@@ -15,7 +15,7 @@ For a more ruby-ish API for creating filesystems see {http://rubygems.org/gems/r
 Dependencies
 --------------
 
- * Ruby 1.8 or 1.9
+ * Ruby 1.9+
  * Fuse 2.8
 
 Installation
