@@ -1,8 +1,7 @@
 RFuse
 ===============
 
-http://rubygems.org/gems/rfuse
-
+http://rubygems.org/gems/rfuse  {<img src="https://badge.fury.io/rb/rfuse.png" alt="Gem Version" />}[http://badge.fury.io/rb/rfuse]
 Ruby FUSE binding
 
 FUSE (Filesystem in USErspace) is a simple interface for userspace programs to export a virtual filesystem to the linux kernel. FUSE aims to provide a secure method for non privileged users to create and mount their own filesystem implementations.
