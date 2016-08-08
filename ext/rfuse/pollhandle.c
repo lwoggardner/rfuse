@@ -1,3 +1,4 @@
+#ifndef __APPLE__
 #include <ruby.h>
 #include <fuse.h>
 
@@ -52,3 +53,4 @@ VALUE pollhandle_init(VALUE module)
 
   return cPollHandle;
 }
+#endif
