@@ -65,8 +65,10 @@ void rfuseconninfo2fuseconninfo(VALUE rfuseconninfo,struct fuse_conn_info *fusec
   fuseconninfo->async_read    = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("async_read"),0));
   fuseconninfo->max_write     = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("max_write"),0));
   fuseconninfo->max_readahead = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("max_readahead"),0));
-  fuseconninfo->capable       = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("capable"),0));
-  fuseconninfo->want          = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("want"),0));
+#ifndef __APPLE__
+    fuseconninfo->capable       = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("capable"),0));
+    fuseconninfo->want          = FIX2UINT(rb_funcall(rfuseconninfo,rb_intern("want"),0));
+#endif
 }
 
 struct fuse_args * rarray2fuseargs(VALUE rarray){
@@ -75,7 +77,7 @@ struct fuse_args * rarray2fuseargs(VALUE rarray){
   struct fuse_args *args;
   //TODO - we probably don't want to execute the rest if the type check fails
   Check_Type(rarray, T_ARRAY);
-  
+
   args = malloc(sizeof(struct fuse_args));
   args->argc      = RARRAY_LEN(rarray) + 1;
   args->argv      = malloc((args->argc + 1) * sizeof(char *));
@@ -88,10 +90,10 @@ struct fuse_args * rarray2fuseargs(VALUE rarray){
       VALUE v;
       v = RARRAY_PTR(rarray)[i];
       Check_Type(v, T_STRING);
-      args->argv[i+1] = strdup(rb_string_value_ptr(&v)); 
+      args->argv[i+1] = strdup(rb_string_value_ptr(&v));
   }
 
   args->argv[args->argc] = NULL;
-                        
+
   return args;
 }

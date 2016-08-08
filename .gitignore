@@ -1,5 +1,12 @@
 *.o
 *.so
 *.gem
+*.bundle
 doc
 .yardoc
+Gemfile.lock
+mkmf.log
+tmp/
+lib/rfuse/rfuse.bundle
+.RUBYARCHDIR*
+

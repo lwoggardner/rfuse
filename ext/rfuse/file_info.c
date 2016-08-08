@@ -5,9 +5,9 @@
 VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi) {
   VALUE rRFuse;
   VALUE rFileInfo;
-  
+
   VALUE rffi;
- 
+
   VALUE open_files;
   VALUE key;
 
@@ -18,7 +18,7 @@ VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi) {
 
   //store the wrapped ffi back into the struct so we don't have to keep wrapping it
   ffi->fh = rffi;
- 
+
   //also store it in an open_files hash on the fuse_object
   //so it doesn't get GC'd
   open_files = rb_iv_get((VALUE) ctx->private_data,"@open_files");
@@ -30,15 +30,15 @@ VALUE wrap_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi) {
 
 //returns a previously wrapped ffi
 VALUE get_file_info(struct fuse_file_info *ffi) {
-    
+
   if (TYPE(ffi->fh) == T_DATA )
       return (VALUE) ffi->fh;
   else
       return Qnil;
-  
+
 };
 
-//Allow the FileInfo object to be GC'd 
+//Allow the FileInfo object to be GC'd
 VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
 {
 
@@ -50,7 +50,7 @@ VALUE release_file_info(struct fuse_context *ctx, struct fuse_file_info *ffi)
       rb_hash_delete(open_files,key);
 
       return rffi;
-  } 
+  }
 
   return Qnil;
 
@@ -101,17 +101,23 @@ VALUE file_info_direct_assign(VALUE self,VALUE value) {
 VALUE file_info_nonseekable(VALUE self) {
    struct fuse_file_info *f;
    Data_Get_Struct(self,struct fuse_file_info,f);
-  if (TYPE(f->nonseekable) != T_NONE) {
-    return (VALUE) f->nonseekable;
-  } else {
-    return Qnil;
-  }
+#ifndef __APPLE__
+    if (TYPE(f->nonseekable) != T_NONE) {
+      return (VALUE) f->nonseekable;
+    } else {
+      return Qnil;
+    }
+#else
+   return Qnil;
+#endif
 }
 
 VALUE file_info_nonseekable_assign(VALUE self,VALUE value) {
    struct fuse_file_info *f;
    Data_Get_Struct(self,struct fuse_file_info,f);
-   f->nonseekable = value;
+#ifndef __APPLE__
+     f->nonseekable = value;
+#endif
    return value;
 }
 
@@ -136,7 +142,7 @@ void file_info_init(VALUE module) {
   rb_define_method(cFileInfo,"direct=",file_info_direct_assign,1);
   rb_define_method(cFileInfo,"nonseekable",file_info_nonseekable,0);
   rb_define_method(cFileInfo,"nonseekable=",file_info_nonseekable_assign,1);
-  
+
   /*
      @return [Object] user specified filehandle object. See {Fuse#open}
   */
