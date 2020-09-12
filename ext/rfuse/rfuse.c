@@ -1190,7 +1190,7 @@ static int rf_releasedir(const char *path,struct fuse_file_info *ffi)
 */
 static VALUE unsafe_fsyncdir(VALUE *args)
 {
-  return rb_funcall(args[0],rb_intern("fsyncdir"),4,&args[1]);
+  return rb_funcall2(args[0],rb_intern("fsyncdir"),4,&args[1]);
 }
 
 static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
