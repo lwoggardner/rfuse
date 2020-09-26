@@ -4,10 +4,10 @@ dist: trusty
 language: ruby
 
 rvm:
-  - "2.1"
-  - "2.2"
-  - "2.0"
-  - "1.9"
+  - "2.4"
+  - "2.5"
+  - "2.6"
+  - "2.7"
 
 before_install:
   - sudo apt-get update -y
@@ -15,9 +15,11 @@ before_install:
   - sudo modprobe fuse
   - sudo chmod 666 /dev/fuse
   - sudo chown root:$USER /etc/fuse.conf
+  - yes | gem update --system --force
+  - gem install bundler
 
 script:
-  - bundle exec rake spec
+  - bundle exec rake
 
 cache:
   bundler: true
