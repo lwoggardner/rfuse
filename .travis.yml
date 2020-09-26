@@ -15,7 +15,7 @@ before_install:
   - sudo modprobe fuse
   - sudo chmod 666 /dev/fuse
   - sudo chown root:$USER /etc/fuse.conf
-  - yes | gem update --system --force
+  - yes | gem update --system -N --force
   - gem install bundler
 
 script:
