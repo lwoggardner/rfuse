@@ -150,7 +150,7 @@ describe RFuse::Fuse do
 
             with_fuse(mountpoint,mockfs) do
                 File.open("#{mountpoint}/test") do |f|
-                    val = f.gets
+                    val = f.gets(nil)
                     val.should == "hello\000world\000"
                 end
             end
