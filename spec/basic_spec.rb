@@ -144,13 +144,15 @@ describe RFuse::Fuse do
 
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
+              #TODO: pr10 - this is actually not valid fuse
+              # Read should return exactly the number of bytes requested except on EOF or error, otherwise the rest of the data will be substituted with zeroes. An exception to this is when the 'direct_io' mount option is specified, in which case the return value of the read system call will reflect the return value of this operation.
                 reads += 2
                 "hello\000world\000"[offset,reads]
             }
 
-            with_fuse(mountpoint,mockfs) do
+            with_fuse(mountpoint,mockfs,'-o','direct_io') do
                 File.open("#{mountpoint}/test") do |f|
-                    val = f.read
+                    val = f.gets
                     val.should == "hello\000world\000"
                 end
             end
