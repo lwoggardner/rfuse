@@ -148,7 +148,7 @@ describe RFuse::Fuse do
                 "hello\000world\000"[offset,reads]
             }
 
-            with_fuse(mountpoint,mockfs) do
+            with_fuse(mountpoint,mockfs,'-o','direct_io') do
                 File.open("#{mountpoint}/test") do |f|
                     val = f.gets
                     val.should == "hello\000world\000"
