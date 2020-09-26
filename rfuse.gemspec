@@ -18,12 +18,13 @@ Gem::Specification.new do |s|
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.has_rdoc = 'yard'
+  s.required_ruby_version = '> 2.4'
+
   s.extra_rdoc_files = 'CHANGES.md'
 
   s.add_development_dependency("rake")
   s.add_development_dependency("rake-compiler")
-  s.add_development_dependency("rspec","~> 3.0.0")
+  s.add_development_dependency("rspec")
   s.add_development_dependency("yard")
   s.add_development_dependency("redcarpet")
   s.add_development_dependency("ffi-xattr")

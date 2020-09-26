@@ -54,10 +54,11 @@ module RFuseHelper
     end
 
     def fusermount(mnt)
-        unless system("fusermount -u #{mnt} >/dev/null 2>&1")
-            sleep(0.5)
-            system("fusermount -u #{mnt}")
-        end
+      puts "unmounting #{mnt}"
+      until system("fusermount -u #{mnt} >/dev/null 2>&1")
+        puts "unmount failed #{mnt}"
+        sleep(0.5)
+      end
     end
 
     def file_mode(mode)

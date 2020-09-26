@@ -1,6 +1,7 @@
 require 'spec_helper'
 
 class MockFuse < RFuse::Fuse; end
+
 class DuckFuse
     def initialize(val); end;
 end
@@ -46,7 +47,6 @@ describe RFuse do
     let(:mountpoint) { tempmount() }
 
     describe ".main" do
-
         let(:re_usage) { Regexp.new("^Usage:\n.*-h.*-d.*\n",Regexp::MULTILINE)  }
         let(:re_help)  { Regexp.new("^Fuse options: \\(\\d.\\d\\)\n.*help.*\n.*debug.*\n\n",Regexp::MULTILINE) }
         let(:re_fuse)  { Regexp.new(".*(^\\s+-o.*$)+.*",Regexp::MULTILINE) }
@@ -121,6 +121,7 @@ describe RFuse do
                 fuse = RFuse.create(fs)
                 expect(fuse).to be(fs)
                 expect(fuse).to be_mounted
+                fuse.unmount
             end
         end
 
@@ -132,18 +133,21 @@ describe RFuse do
                 expect(fuse).to be_kind_of(MockFuse)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted
+                fuse.unmount
             end
         end
 
         context "with a Class" do
             let(:fs) { DuckFuse }
             it "creates a FuseDelegator around a new instance" do
+
                 expect(fs).to receive(:new).with("OptionValue").and_call_original()
                 expect(RFuse::FuseDelegator).to receive(:new).with(an_instance_of(DuckFuse),mountpoint).and_call_original()
                 fuse = RFuse.create(fs,[mountpoint],{:myopt => "OptionValue"},[:myopt])
                 expect(fuse).to be_kind_of(RFuse::FuseDelegator)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted
+                fuse.unmount
             end
         end
         context "with a non-Fuse Object" do
@@ -154,6 +158,7 @@ describe RFuse do
                 expect(fuse).to be_kind_of(RFuse::FuseDelegator)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted
+                fuse.unmount
             end
         end
 

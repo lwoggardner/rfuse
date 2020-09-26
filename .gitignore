@@ -3,3 +3,5 @@
 *.gem
 doc
 .yardoc
+.idea
+

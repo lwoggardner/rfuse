@@ -40,8 +40,10 @@ describe RFuse::Fuse do
             # raising an error in a sighandler will exit the loop..
             expect(mockfs).to receive(:sighup).and_raise("oh noes")
             pid = Process.pid
+
             # Need to call this before we fork..
             expect(fuse.mountpoint).to eq(mountpoint)
+
 
             fpid = Kernel.fork do
                 File.stat("#{mountpoint}/run")

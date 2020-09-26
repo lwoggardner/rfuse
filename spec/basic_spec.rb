@@ -35,8 +35,11 @@ describe RFuse::Fuse do
                 filler.push("world",nil,0)
             end
 
-            with_fuse(mountpoint,mockfs) do
-                entries = Dir.entries(mountpoint)
+            mockfs.stub(:getattr).with(anything(),'/').and_return(dir_stat)
+
+            mp = mountpoint
+            with_fuse(mp,mockfs) do
+                entries = Dir.entries(mp)
                 entries.size.should == 2
                 entries.should include("hello")
                 entries.should include("world")
