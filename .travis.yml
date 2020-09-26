@@ -4,21 +4,21 @@ sudo: required
 jobs:
   include:
     - os: linux
-      dist: trusty
-    - os: linux
       dist: xenial
     - os: linux
       dist: bionic
     - os: linux
       dist: focal
+    - os: linux
+      dist: trusty
 
 language: ruby
 
 rvm:
-  - "2.4"
-  - "2.5"
   - "2.6"
   - "2.7"
+  - "2.5"
+  - "2.4"
 
 before_install:
   - sudo apt-get update -y
