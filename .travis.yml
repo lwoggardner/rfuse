@@ -1,6 +1,17 @@
 
 sudo: required
-dist: trusty
+
+jobs:
+  include:
+    - os: linux
+      dist: trusty
+    - os: linux
+      dist: xenial
+    - os: linux
+      dist: bionic
+    - os: linux
+      dist: focal
+
 language: ruby
 
 rvm:
