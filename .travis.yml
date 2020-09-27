@@ -15,6 +15,7 @@ jobs:
       deploy:
         - provider: 'rubygems'
           on:
+            repo: lwoggardner/rfuse
             tags: true
           api_key:
             secure: "Crsrr71RwfGXjA2a32SLC8ADnf5yY61r78rUVA15RO2lfla/t0CA25rZ6WZD9b9m2kSasOSNxh2DCwNfZKjMuc9UCWxMZ0br0Pw4SIReka5RPMbxR+TeWNZ/B9xgb7z2V0KdtXtiYlIaV28YqkU1+Bm8qYC4cc8W/KtX7eji/94="
@@ -26,6 +27,7 @@ jobs:
       deploy:
         - provider: 'rubygems'
           on:
+            repo: lwoggardner/rfuse
             all_branches: true
             condition: '$TRAVIS_BRANCH =~ ^rc'
           api_key:

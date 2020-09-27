@@ -32,5 +32,4 @@ Gem::Specification.new do |s|
   s.add_development_dependency("redcarpet")
   s.add_development_dependency("ffi-xattr")
   s.add_development_dependency("sys-filesystem")
-  s.add_development_dependency("travis-release")
 end
