@@ -29,6 +29,9 @@ GEM
     rspec-support (3.9.3)
     sys-filesystem (1.3.4)
       ffi
+    travis-release (0.0.4)
+      bundler
+      rake
     yard (0.9.25)
 
 PLATFORMS
@@ -42,6 +45,7 @@ DEPENDENCIES
   rfuse!
   rspec
   sys-filesystem
+  travis-release
   yard
 
 BUNDLED WITH
