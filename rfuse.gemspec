@@ -1,24 +1,22 @@
 # -*- encoding: utf-8 -*-
-$:.push File.expand_path("../lib", __FILE__)
-require "rfuse/version"
+require_relative "lib/rfuse/version"
 
 Gem::Specification.new do |s|
   s.name        = "rfuse"
-  s.version     = RFuse::VERSION
+  s.version     = "#{RFuse::VERSION}"
+  # Pre-release deployment on matching branches
+  s.version     = "#{s.version}.#{ENV['TRAVIS_BRANCH']}.#{ENV['TRAVIS_BUILD_NUMBER']}" if (ENV['TRAVIS_TAG'] || '') == '' && ENV['TRAVIS_BUILD_STAGE_NAME'].downcase == 'deploy'
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Grant Gardner"]
   s.email       = ["grant@lastweekend.com.au"]
   s.homepage    = "http://rubygems.org/gems/rfuse"
   s.summary     = %q{Ruby language binding for FUSE}
   s.description = %q{Write userspace filesystems in Ruby}
-
-  s.files         = `git ls-files`.split("\n")
+  s.files       = Dir['lib/**/*.rb','ext/**/*.{c,h,rb}','*.md','LICENSE','.yardopts']
   s.extensions    = 'ext/rfuse/extconf.rb'
-  s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
-  s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.required_ruby_version = '> 2.4'
+  s.required_ruby_version = '>= 2.5'
 
   s.extra_rdoc_files = 'CHANGES.md'
 

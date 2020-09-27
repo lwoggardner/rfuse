@@ -1,3 +1,9 @@
+1.2.0 - 2020/09
+-------------------
+  * Fix builds on recent linux
+  * Require Ruby 2.4+
+  * Release via Travis
+
 1.1.2 - 2015/11/28
 ------------------
 

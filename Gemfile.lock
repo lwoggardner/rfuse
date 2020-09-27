@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rfuse (1.2.0.RC0)
+    rfuse (1.2.0)
 
 GEM
   remote: http://rubygems.org/

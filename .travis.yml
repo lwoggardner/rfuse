@@ -1,6 +1,4 @@
 
-sudo: required
-
 jobs:
   include:
     - os: linux
@@ -9,8 +7,22 @@ jobs:
       dist: bionic
     - os: linux
       dist: focal
-    - os: linux
-      dist: trusty
+    - stage: deploy
+      script: skip
+      before_install: []
+      deploy:
+        - provider: 'rubygems'
+          on:
+            branch: 'master'
+            tags: true
+          api_key:
+            secure: "Crsrr71RwfGXjA2a32SLC8ADnf5yY61r78rUVA15RO2lfla/t0CA25rZ6WZD9b9m2kSasOSNxh2DCwNfZKjMuc9UCWxMZ0br0Pw4SIReka5RPMbxR+TeWNZ/B9xgb7z2V0KdtXtiYlIaV28YqkU1+Bm8qYC4cc8W/KtX7eji/94="
+        - provider: 'rubygems'
+          on:
+            all_branches: true
+            condition: '$TRAVIS_BRANCH =~ ^rc.*$'
+          api_key:
+            secure: "Crsrr71RwfGXjA2a32SLC8ADnf5yY61r78rUVA15RO2lfla/t0CA25rZ6WZD9b9m2kSasOSNxh2DCwNfZKjMuc9UCWxMZ0br0Pw4SIReka5RPMbxR+TeWNZ/B9xgb7z2V0KdtXtiYlIaV28YqkU1+Bm8qYC4cc8W/KtX7eji/94="
 
 language: ruby
 
@@ -18,7 +30,6 @@ rvm:
   - "2.6"
   - "2.7"
   - "2.5"
-  - "2.4"
 
 before_install:
   - sudo apt-get update -y
