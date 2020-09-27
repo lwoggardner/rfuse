@@ -1,5 +1,4 @@
 #!/usr/bin/env rake
-require "bundler/gem_tasks"
 require 'yard'
 require 'rspec/core/rake_task'
 require 'rake/extensiontask'
@@ -16,3 +15,4 @@ end
 
 task :spec => :compile
 task :default => :spec
+
