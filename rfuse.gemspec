@@ -4,9 +4,14 @@ require_relative "lib/rfuse/version"
 Gem::Specification.new do |s|
   s.name        = "rfuse"
   s.version     = "#{RFuse::VERSION}"
-  # Pre-release deployment on matching branches
-  s.version     = "#{s.version}.#{ENV['TRAVIS_BRANCH']}.#{ENV['TRAVIS_BUILD_NUMBER']}" if (ENV['TRAVIS_TAG'] || '') == '' && ENV['TRAVIS_BUILD_STAGE_NAME'].downcase == 'deploy'
+  # Only use the release version for actual deployment
+  if ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'prerelease'
+    s.version = "#{s.version}.#{ENV['TRAVIS_BRANCH']}.#{ENV['TRAVIS_BUILD_NUMBER']}"
+  elsif ENV['TRAVIS'] != 'true' || ENV['TRAVIS_BUILD_STAGE_NAME'].downcase != 'deploy'
+    s.version= "#{s.version}.pre"
+  end
   s.platform    = Gem::Platform::RUBY
+  s.license     = 'GPL-2.0'
   s.authors     = ["Grant Gardner"]
   s.email       = ["grant@lastweekend.com.au"]
   s.homepage    = "http://rubygems.org/gems/rfuse"
