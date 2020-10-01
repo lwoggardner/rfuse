@@ -4,12 +4,16 @@ require_relative "lib/rfuse/version"
 Gem::Specification.new do |s|
   s.name        = "rfuse"
   s.version     = "#{RFuse::VERSION}"
+
   # Only use the release version for actual deployment
   if ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'prerelease'
     s.version = "#{s.version}.#{ENV['TRAVIS_BRANCH']}.#{ENV['TRAVIS_BUILD_NUMBER']}"
-  elsif ENV['TRAVIS'] != 'true' || ENV['TRAVIS_BUILD_STAGE_NAME'].downcase != 'deploy'
+  elsif ENV['RFUSE_RELEASE'] || ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'deploy'
+    # leave as is
+  else
     s.version= "#{s.version}.pre"
   end
+
   s.platform    = Gem::Platform::RUBY
   s.license     = 'GPL-2.0'
   s.authors     = ["Grant Gardner"]
