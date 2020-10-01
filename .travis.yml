@@ -11,7 +11,7 @@ jobs:
       script: skip
       before_install: []
       install: skip
-      if: branch = master
+      if: tag =~ /^v\d\.\d\.\d$/
       deploy:
         - provider: 'rubygems'
           on:
