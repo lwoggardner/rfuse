@@ -8,6 +8,16 @@ describe RFuse::Fuse do
         let(:mockfs) { m = double("fuse"); allow(m).to receive(:getattr) { |ctx,path| puts "#{ctx},#{path}"}; m }
         let(:fuse) { RFuse::FuseDelegator.new(mockfs,mountpoint) }
 
+        before(:each) do
+            # Override traps (note rspec itself traps "INT") with "DEFAULT"
+            @traps = ["INT","TERM","HUP","USR1","USR2"].inject({}) { |h,signame| h[signame] = Signal.trap(signame,"DEFAULT"); h }
+        end
+
+        after(:each) do
+            # Restore previously set traps
+            @traps.each_pair { |signame,prev_trap| Signal.trap(signame,prev_trap) }
+        end
+
         it "runs a mounted filesystem with default traps" do
 
             # expect traps to be set
