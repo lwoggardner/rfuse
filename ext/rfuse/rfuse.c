@@ -3,7 +3,7 @@
 #define _XOPEN_SOURCE 500
 #endif
 //FOR LINUX ONLY
-#include <linux/stat.h> 
+//#include <linux/stat.h>
 #include <linux/kdev_t.h>
 
 #include <ruby.h>
