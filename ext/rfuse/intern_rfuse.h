@@ -1,7 +1,5 @@
 #include <fuse.h>
 
-#define MOUNTNAME_MAX 1024
-
 struct intern_fuse {
   struct fuse_chan *fc;
   struct fuse *fuse;

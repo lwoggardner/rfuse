@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
 
   # Only use the release version for actual deployment
   if ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'prerelease'
-    s.version = "#{s.version}.#{ENV['TRAVIS_BRANCH']}.#{ENV['TRAVIS_BUILD_NUMBER']}"
+    s.version = "#{s.version}.#{ENV['TRAVIS_BRANCH']}@#{ENV['TRAVIS_BUILD_NUMBER']}"
   elsif ENV['RFUSE_RELEASE'] || ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'deploy'
     # leave as is
   else
@@ -28,7 +28,7 @@ Gem::Specification.new do |s|
   s.required_ruby_version = '>= 2.5'
 
   s.extra_rdoc_files = 'CHANGES.md'
-
+  s.add_dependency('ffi-libfuse')
   s.add_development_dependency("rake")
   s.add_development_dependency("rake-compiler")
   s.add_development_dependency("rspec")

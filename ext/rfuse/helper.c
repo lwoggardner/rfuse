@@ -81,7 +81,7 @@ struct fuse_args * rarray2fuseargs(VALUE rarray){
   args->argv      = malloc((args->argc + 1) * sizeof(char *));
   args->allocated = 1;
 
-
+  // GG ffi - this is the program filename
   args->argv[0] = strdup("");
 
   for(i = 0; i < args->argc - 1; i++) {

@@ -1206,17 +1206,7 @@ static int rf_fsyncdir(const char *path,int meta,struct fuse_file_info *ffi)
   return error ?  -(return_error(ENOENT)) : 0 ;
 }
 
-/*
-   Called when filesystem is initialised
 
-   @overload init(info)
-   @abstract Fuse Operation {http://fuse.sourceforge.net/doxygen/structfuse__operations.html#dc6dc71274f185de72217e38d62142c4 init}
-
-   @param [Context] context
-   @param [Struct] info connection information
-
-   @return [void]
-*/
 static VALUE unsafe_init(VALUE* args)
 {
   return rb_funcall3(args[0],rb_intern("init"),2,&args[1]);
@@ -1802,7 +1792,7 @@ static VALUE rf_initialize(
   //Allow things like Pathname to be sent as a mountpoint
   mountpoint = rb_obj_as_string(mountpoint_arg);
 
-  //Is this redundant if scan_args has populted opts?
+  //Is this redundant if scan_args has populated opts?
   Check_Type(opts, T_ARRAY);
 
   Data_Get_Struct(self,struct intern_fuse,inf);
