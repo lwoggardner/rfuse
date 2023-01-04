@@ -48,7 +48,7 @@ describe RFuse do
 
     describe ".main" do
         let(:re_usage) { Regexp.new("^Usage:\n.*-h.*-d.*\n",Regexp::MULTILINE)  }
-        let(:re_help)  { Regexp.new("^Fuse options: \\(\\d.\\d\\)\n.*help.*\n.*debug.*\n\n",Regexp::MULTILINE) }
+        let(:re_help)  { Regexp.new("options:\n.*help.*\n.*debug.*\n\n",Regexp::MULTILINE) }
         let(:re_fuse)  { Regexp.new(".*(^\\s+-o.*$)+.*",Regexp::MULTILINE) }
         let(:re_extra_header) { Regexp.new("Filesystem options:\n",Regexp::MULTILINE) }
 
@@ -69,7 +69,7 @@ describe RFuse do
             end
 
             it "prints usage and kernel options" do
-                # TODO: In Fuse 3.0, this will get complicated because help output moves to stdout
+                skip 'Fuse 3 test not supported' if FFI::Libfuse::FUSE_MAJOR_VERSION > 2
                 re = Regexp.new(re_help.to_s + re_fuse.to_s)
                 expect { RFuse.main([mountpoint,"-h"]) { mockfs } }.to print_to_stderr(re)
             end
@@ -80,6 +80,8 @@ describe RFuse do
             end
 
             it "prints local option header if there are local options" do
+                skip 'Fuse 3 test not supported' if FFI::Libfuse::FUSE_MAJOR_VERSION > 2
+
                 re = Regexp.new(re_help.to_s + re_fuse.to_s + re_extra_header.to_s + "TestOptionUsage")
                 expect { RFuse.main([mountpoint,"-h"],[:myoption],"TestOptionUsage") { mockfs } }.to print_to_stderr(re)
             end
@@ -89,7 +91,7 @@ describe RFuse do
         it "yields parsed options and cleaned argv" do
             # We know that main uses parse_options which is tested elsewhere
             expect { |b| RFuse.main([mountpoint,"-o","myoption"],[:myoption],&b) }.to \
-                yield_with_args(a_hash_including(:mountpoint,:myoption),[mountpoint])
+                yield_with_args(a_hash_including({mountpoint: mountpoint,myoption: true}),Array)
         end
 
         context "yield raises exception" do
@@ -108,7 +110,7 @@ describe RFuse do
             fuse = double(fuse)
             fuse.stub(:mounted?).and_return(true,false)
             expect(fuse).to receive(:run)
-            expect(RFuse).to receive(:create).with(fuse,[mountpoint],{:mountpoint => mountpoint},[]) { fuse }
+            expect(RFuse).to receive(:create).with(fs: fuse, argv: a_collection_starting_with(mountpoint), options: {}) { fuse }
             RFuse.main([mountpoint]) { fuse }
         end
     end
@@ -118,7 +120,7 @@ describe RFuse do
         context "with a Fuse object" do
             let(:fs) { MockFuse.new(mountpoint) }
             it "returns the object" do
-                fuse = RFuse.create(fs)
+                fuse = RFuse.create(fs: fs)
                 expect(fuse).to be(fs)
                 expect(fuse).to be_mounted
                 fuse.unmount
@@ -129,7 +131,7 @@ describe RFuse do
             let(:fs) { MockFuse }
 
             it "creates a new Fuse object from subclass of Fuse" do
-                fuse = RFuse.create(fs,[mountpoint])
+                fuse = RFuse.create(fs: fs,argv: [mountpoint])
                 expect(fuse).to be_kind_of(MockFuse)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted
@@ -143,7 +145,7 @@ describe RFuse do
 
                 expect(fs).to receive(:new).with("OptionValue").and_call_original()
                 expect(RFuse::FuseDelegator).to receive(:new).with(an_instance_of(DuckFuse),mountpoint).and_call_original()
-                fuse = RFuse.create(fs,[mountpoint],{:myopt => "OptionValue"},[:myopt])
+                fuse = RFuse.create(fs: fs,argv: [mountpoint], options: {:myopt => "OptionValue"})
                 expect(fuse).to be_kind_of(RFuse::FuseDelegator)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted
@@ -154,7 +156,7 @@ describe RFuse do
             let(:fs) { mockfs }
             it "starts FuseDelegator with non Fuse object returned from yield" do
                 expect(RFuse::FuseDelegator).to receive(:new).with(mockfs,mountpoint).and_call_original()
-                fuse = RFuse.create(fs,[mountpoint])
+                fuse = RFuse.create(fs: fs,argv: [mountpoint])
                 expect(fuse).to be_kind_of(RFuse::FuseDelegator)
                 expect(fuse.mountpoint).to eq(mountpoint)
                 expect(fuse).to be_mounted

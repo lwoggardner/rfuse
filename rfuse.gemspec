@@ -3,16 +3,18 @@ require_relative "lib/rfuse/version"
 
 Gem::Specification.new do |s|
   s.name        = "rfuse"
-  s.version     = "#{RFuse::VERSION}"
 
+  version = "#{RFuse::VERSION}"
   # Only use the release version for actual deployment
   if ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'prerelease'
-    s.version = "#{s.version}.#{ENV['TRAVIS_BRANCH']}@#{ENV['TRAVIS_BUILD_NUMBER']}"
+    version = "#{version}.#{ENV['TRAVIS_BRANCH']}@#{ENV['TRAVIS_BUILD_NUMBER']}"
   elsif ENV['RFUSE_RELEASE'] || ENV['TRAVIS_BUILD_STAGE_NAME']&.downcase == 'deploy'
     # leave as is
   else
-    s.version= "#{s.version}.pre"
+    version= "#{version}.pre"
   end
+
+  s.version = version
 
   s.platform    = Gem::Platform::RUBY
   s.license     = 'GPL-2.0'
@@ -21,14 +23,13 @@ Gem::Specification.new do |s|
   s.homepage    = "http://rubygems.org/gems/rfuse"
   s.summary     = %q{Ruby language binding for FUSE}
   s.description = %q{Write userspace filesystems in Ruby}
-  s.files       = Dir['lib/**/*.rb','ext/**/*.{c,h,rb}','*.md','LICENSE','.yardopts']
-  s.extensions    = 'ext/rfuse/extconf.rb'
+  s.files       = Dir['lib/**/*.rb','*.md','LICENSE','.yardopts']
   s.require_paths = ["lib"]
 
   s.required_ruby_version = '>= 2.5'
 
   s.extra_rdoc_files = 'CHANGES.md'
-  s.add_dependency('ffi-libfuse')
+  s.add_dependency('ffi-libfuse', "~> 0.1.0a")
   s.add_development_dependency("rake")
   s.add_development_dependency("rake-compiler")
   s.add_development_dependency("rspec")

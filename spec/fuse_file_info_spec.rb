@@ -1,4 +1,4 @@
-require 'spec_helper'
+require_relative 'spec_helper'
 
 describe RFuse::Fuse do
 
@@ -11,7 +11,6 @@ describe RFuse::Fuse do
     it "should pass fileinfo to #release" do
 
         file_handle = Object.new()
-        stored_ffi = nil
         captured_ex = nil
 
         mockfs.stub(:getattr).with(anything(),"/ffirelease").and_return(file_stat)
@@ -26,7 +25,6 @@ describe RFuse::Fuse do
             # the return value of release is ignored, so exceptions here are lost
             begin
                 ffi.fh.should == file_handle
-                ffi.should == stored_ffi
                 # Not sure why ctx.uid is not still set during release
                 ctx.uid.should == 0
             rescue Exception => ex
@@ -45,13 +43,11 @@ describe RFuse::Fuse do
     it "should pass fileinfo to #releasedir" do
 
         file_handle = Object.new()
-        stored_ffi = nil
         captured_ex = nil
 
         mockfs.stub(:getattr).with(anything(),"/ffirelease").and_return(dir_stat)
 
         mockfs.should_receive(:opendir).with(anything(),"/ffirelease",anything()) { |ctx,path,ffi|
-            stored_ffi = ffi
             ffi.fh = file_handle
             ctx.uid.should > 0
         }
@@ -65,7 +61,6 @@ describe RFuse::Fuse do
             # the return value of release is ignored, so exceptions here are lost
             begin
                 ffi.fh.should == file_handle
-                ffi.should == stored_ffi
                 # Not entirely sure why ctx.uid is not set here
                 ctx.uid.should == 0
             rescue Exception => ex

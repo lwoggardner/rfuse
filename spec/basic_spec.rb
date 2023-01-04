@@ -106,7 +106,7 @@ describe RFuse::Fuse do
             end
         end
         it "should set file access and modification times" do
-
+            skip 'utime deprecated in Fuse3' if FFI::Libfuse::FUSE_MAJOR_VERSION > 2
             atime = Time.now()
             mtime = atime + 1
 
@@ -141,14 +141,21 @@ describe RFuse::Fuse do
             file_stat.size = 12
             mockfs.stub(:getattr).with(anything(),"/test").and_return(file_stat)
 
+            if FFI::Libfuse::FUSE_MAJOR_VERSION > 2
+                mockfs.stub(:open) do |ctx,path,ffi|
+                  ffi.direct_io = true
+                end
+            end
 
+            args = []
+            args << '-odirect_io' if FFI::Libfuse::FUSE_MAJOR_VERSION == 2
             reads = 0
             mockfs.stub(:read) { |ctx,path,size,offset,ffi|
                 reads += 2
                 "hello\000world\000"[offset,reads]
             }
 
-            with_fuse(mountpoint,mockfs,'-o','direct_io') do
+            with_fuse(mountpoint,mockfs,*args) do
                 File.open("#{mountpoint}/test") do |f|
                     val = f.gets
                     val.should == "hello\000world\000"

@@ -16,7 +16,7 @@ describe RFuse::Fuse do
             fuse.loop
             t.join
             fuse.unmount
-            fuse.mounted?.should be(false)
+            fuse.mounted?.should be_falsey
         end
 
 
@@ -51,7 +51,7 @@ describe RFuse::Fuse do
                 file_stat
             }
 
-            t = Thread.new() { sleep 0.5 ; thread_ran = true }
+            t = Thread.new() { sleep 1.5 ; thread_ran = true }
             with_fuse(mountpoint,mockfs) do
                 File.stat("#{mountpoint}/before");
                 sleep 1;
