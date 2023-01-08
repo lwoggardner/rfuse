@@ -35,7 +35,7 @@ jobs:
         run: ".github/scripts/patch_bump.sh ${FROM_VERSION} ${VERSION_FILE}"
         env:
           GITHUB_USER_NAME: "GitHub Action ${{github.workflow}}"
-          VERSION_FILE: 'lib/ffi/libfuse/version.rb'
+          VERSION_FILE: "lib/rfuse/version.rb"
           FROM_VERSION: "${{fromJSON(needs.release-please.outputs.json).version}}"
   call-release:
     needs: release-please

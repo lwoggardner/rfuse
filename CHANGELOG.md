@@ -1,3 +1,6 @@
+2.0.1 / ?
+---------------
+
 2.0.0 - 2023/01 UNMAINTAINED
 -------------------
   * Uses ffi-libfuse instead of local C extension
