@@ -15,9 +15,8 @@ Gem::Specification.new do |s|
   s.files       = Dir['lib/**/*.rb','*.md','LICENSE','.yardopts']
   s.require_paths = ["lib"]
 
-  s.required_ruby_version = '>= 2.5'
+  s.required_ruby_version = '>= 2.7'
 
-  s.extra_rdoc_files = 'CHANGES.md'
   s.add_dependency('ffi-libfuse', ">= 0.3.4")
   s.add_development_dependency("rake")
   s.add_development_dependency("rake-compiler")
