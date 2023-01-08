@@ -15,7 +15,7 @@ Existing RFuse filesystems are recommended to refactor to depend directly on
 ### Dependencies
 
  * Ruby 2.7+
- * Fuse 2.8+
+ * Fuse 2.8+ / Fuse 3 / MACFuse
 
 HISTORY
 ============
@@ -26,7 +26,7 @@ RFuse-NG: Tamás László Fábián <giganetom@gmail.com> et al on Github
 
 Original Rfuse (@rubyforge): Peter Schrammel AT gmx.de
 
-See also {file:CHANGES.md}
+See also {file:CHANGELOG.md}
 
 ~~CONTRIBUTING~~
 ============
