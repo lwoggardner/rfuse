@@ -5,4 +5,6 @@ doc
 .yardoc
 .idea
 Gemfile.lock
+!.github
+
 

@@ -1,3 +1,9 @@
+2.0.0 - 2023/01 UNMAINTAINED
+-------------------
+  * Uses ffi-libfuse instead of local C extension
+  * Starting filesystems through RFuse.main
+  * Require Ruby 2.7+
+
 1.2.0 - 2020/09
 -------------------
   * Fix builds on recent linux

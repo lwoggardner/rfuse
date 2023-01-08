@@ -60,7 +60,7 @@ describe RFuse::Fuse do
                 Process.kill("HUP",pid)
             end
 
-            expect { fuse.run }.to raise_error
+            fuse.run
 
             pid,result = Process.waitpid2(fpid)
 

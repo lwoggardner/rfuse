@@ -1,0 +1,29 @@
+AllCops:
+  TargetRubyVersion: 2.6
+  Exclude:
+    - 'spec/**/*_spec.rb'
+
+# We're a FUSE filesystem we're going to see the perl syntax sometimes
+Style/SpecialGlobalVars:
+  Enabled: false
+
+# If we can see it on half a screen, it is ok.
+Metrics/MethodLength:
+  Description: 'Avoid methods longer than 20 lines of code.'
+  Max: 20
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/ParameterLists:
+  Max: 7
+
+# Back it off the complexity metrics a bit
+Metrics/AbcSize:
+  Max: 25
+
+Metrics/CyclomaticComplexity:
+  Max: 12
+
+Metrics/PerceivedComplexity:
+  Max: 12

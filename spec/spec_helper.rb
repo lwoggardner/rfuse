@@ -30,32 +30,32 @@ module RFuseHelper
     # that is expected to return success
     def with_fuse(mnt,mockfs,*options,&fork_block)
 
-        fuse = RFuse::FuseDelegator.new(mockfs,mnt,*options)
+        fuse = RFuse::FuseDelegator.new(mockfs,mnt, *options)
         fuse.mounted?.should be(true)
         fork_fuse(fuse) do
             begin
-                fork_block.call() if fork_block
+              sleep 1
+              fork_block.call() if fork_block
             ensure
-                fusermount(mnt)
+              fusermount(mnt)
             end
         end
         fuse.open_files.should be_empty()
-        fuse.mounted?.should be(false)
+        fuse.mounted?.should be_falsey()
     end
 
     def fork_fuse(fuse,&fork_block)
 
-        fpid = Kernel.fork() { fork_block.call() }
+      fpid = Kernel.fork() { fork_block.call() }
 
-        fuse.loop
+      fuse.loop
 
-        pid,result = Process.waitpid2(fpid)
-        result.should be_success
+      pid,result = Process.waitpid2(fpid)
+      result.should be_success
     end
 
     def fusermount(mnt)
-      puts "unmounting #{mnt}"
-      until system("fusermount -u #{mnt} >/dev/null 2>&1")
+      until system("fusermount -u #{mnt}") #">/dev/null 2>&1")
         puts "unmount failed #{mnt}"
         sleep(0.5)
       end
